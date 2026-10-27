@@ -1,0 +1,2 @@
+(-) - 100#3412142000000000  Engine: Speed=582.5 rpm Temp=-20 degC Gear=2 (Second)
+(-) - 18FEF1FE#01D0070000000000  Status: Page=1 Amps=200 A

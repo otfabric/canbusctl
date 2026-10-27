@@ -1,0 +1,5 @@
+VERSION ""
+BU_: A
+BO_ 1 M: 8 A
+ SG_ S : 0|8@1+ (1,0) [0|0] "" A
+EV_ V: 0 [0|1] "" 0 1 DUMMY_NODE_VECTOR0 Vector__XXX;

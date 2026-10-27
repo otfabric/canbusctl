@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/otfabric/canbusctl/schemas/record-v1.schema.json",
+  "title": "canbusctl stream record (JSON Lines), version 1",
+  "type": "object",
+  "required": ["schemaVersion", "type"],
+  "properties": {
+    "schemaVersion": {"type": "string", "pattern": "^1\\."},
+    "type": {"enum": ["frame", "message", "note", "summary"]}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"type": {"const": "frame"}}},
+      "then": {
+        "required": ["id", "idHex", "extended", "fd", "brs", "esi", "remote", "error", "len", "data"],
+        "properties": {
+          "timestamp": {"type": "string", "pattern": "^[0-9]+\\.[0-9]{6}$"},
+          "interface": {"type": "string"},
+          "id": {"type": "integer", "minimum": 0, "maximum": 536870911},
+          "idHex": {"type": "string", "pattern": "^([0-9A-F]{3}|[0-9A-F]{8})$"},
+          "len": {"type": "integer", "minimum": 0, "maximum": 64},
+          "data": {"type": "string", "pattern": "^([0-9a-f]{2})*$"},
+          "message": {"type": "string"},
+          "signals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["name", "raw", "physical"],
+              "properties": {"name": {"type": "string"}, "raw": {"type": "string", "pattern": "^-?[0-9]+$"}, "physical": {"oneOf": [{"type": "number"}, {"enum": ["NaN", "+Inf", "-Inf"]}]}, "unit": {"type": "string"}, "label": {"type": "string"}}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "message"}}},
+      "then": {"required": ["len", "data"], "properties": {"len": {"type": "integer"}, "data": {"type": "string"}, "txId": {"type": "string"}}}
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+testdata/vehicle.dbc (dbc): 3 messages, 2 nodes
+  100       Engine                        8 bytes   3 signals 10 ms
+  18FEF1FE  Status                        8 bytes   3 signals mux 50 ms
+  200       Wide                         12 bytes   1 signals FD

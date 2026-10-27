@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.0",
+  "command": "dbc inspect",
+  "result": {
+    "database": "testdata/vehicle.dbc",
+    "format": "dbc",
+    "version": "vehicle 1",
+    "nodes": [
+      "ECU",
+      "Dash"
+    ],
+    "messages": [
+      {
+        "name": "Engine",
+        "id": 256,
+        "idHex": "100",
+        "extended": false,
+        "length": 8,
+        "fd": false,
+        "cycleTime": 10,
+        "senders": [
+          "ECU"
+        ],
+        "signals": 3,
+        "multiplexed": false
+      },
+      {
+        "name": "Status",
+        "id": 419361278,
+        "idHex": "18FEF1FE",
+        "extended": true,
+        "length": 8,
+        "fd": false,
+        "cycleTime": 50,
+        "senders": [
+          "ECU"
+        ],
+        "signals": 3,
+        "multiplexed": true
+      },
+      {
+        "name": "Wide",
+        "id": 512,
+        "idHex": "200",
+        "extended": false,
+        "length": 12,
+        "fd": true,
+        "senders": [
+          "ECU"
+        ],
+        "signals": 1,
+        "multiplexed": false
+      }
+    ],
+    "diagnostics": []
+  }
+}

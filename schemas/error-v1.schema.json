@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/otfabric/canbusctl/schemas/error-v1.schema.json",
+  "title": "canbusctl error document, version 1",
+  "type": "object",
+  "required": ["schemaVersion", "error"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {"type": "string", "pattern": "^1\\."},
+    "error": {
+      "type": "object",
+      "required": ["kind", "code", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"enum": ["usage", "invalid_input", "transport", "timeout", "protocol", "unsupported", "safety", "permission", "output", "internal"]},
+        "code": {"type": "string"},
+        "message": {"type": "string"}
+      }
+    }
+  }
+}
