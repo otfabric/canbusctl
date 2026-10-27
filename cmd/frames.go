@@ -345,6 +345,9 @@ without --yes.`,
 						return err
 					}
 					if err := t.Send(ctx, &frames[i]); err != nil {
+						if ended(ctx, err) { // --duration ended during a send
+							return a.emit(name, res)
+						}
 						return err
 					}
 					res.Sent++
