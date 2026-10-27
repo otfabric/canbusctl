@@ -332,7 +332,7 @@ func frameSource(a *app, args []string, trace string) (func() (canbus.Frame, err
 		}
 		var f canbus.Frame
 		if err := captureFrame(l, &f); err != nil {
-			return f, errs.New(errs.KindInvalidInput, errs.CodeInvalidFrame, "frame %q: %v", l, err)
+			return f, errs.New(errs.KindInvalidInput, errs.CodeInvalidFrame, "%v", err)
 		}
 		return f, nil
 	}, func() {}, nil

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/otfabric/canbusctl/schemas/result-v1.schema.json",
+  "title": "canbusctl result document, version 1",
+  "description": "The envelope of single-result commands. The shape of result depends on command; see docs/json-output.md.",
+  "type": "object",
+  "required": ["schemaVersion", "command", "result"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {"type": "string", "pattern": "^1\\."},
+    "command": {"type": "string"},
+    "result": {"type": "object"}
+  }
+}

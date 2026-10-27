@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"sort"
 	"strconv"
@@ -44,17 +45,22 @@ type frameRecord struct {
 }
 
 type decodedSignal struct {
-	Name     string  `json:"name"`
-	Raw      string  `json:"raw"`
-	Physical float64 `json:"physical"`
-	Unit     string  `json:"unit,omitempty"`
-	Label    string  `json:"label,omitempty"`
+	Name     string `json:"name"`
+	Raw      string `json:"raw"`
+	Physical any    `json:"physical"` // a number, or "NaN", "+Inf", "-Inf" (JSON has no such numbers)
+	Unit     string `json:"unit,omitempty"`
+	Label    string `json:"label,omitempty"`
+	value    float64
 }
 
 func decodeSignals(sigs []candb.DecodedSignal) []decodedSignal {
 	out := make([]decodedSignal, 0, len(sigs))
 	for _, s := range sigs {
-		out = append(out, decodedSignal{Name: s.Signal.Name, Raw: s.Signal.RawString(s.Value), Physical: s.Physical, Unit: s.Signal.Unit, Label: s.Label})
+		var phys any = s.Physical
+		if math.IsNaN(s.Physical) || math.IsInf(s.Physical, 0) {
+			phys = strconv.FormatFloat(s.Physical, 'g', -1, 64)
+		}
+		out = append(out, decodedSignal{Name: s.Signal.Name, Raw: s.Signal.RawString(s.Value), Physical: phys, Unit: s.Signal.Unit, Label: s.Label, value: s.Physical})
 	}
 	return out
 }
@@ -62,7 +68,7 @@ func decodeSignals(sigs []candb.DecodedSignal) []decodedSignal {
 func signalsText(sigs []decodedSignal) string {
 	var parts []string
 	for _, s := range sigs {
-		p := s.Name + "=" + strconv.FormatFloat(s.Physical, 'g', -1, 64)
+		p := s.Name + "=" + strconv.FormatFloat(s.value, 'g', -1, 64)
 		if s.Unit != "" {
 			p += " " + s.Unit
 		}

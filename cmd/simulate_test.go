@@ -60,3 +60,8 @@ func TestInject(t *testing.T) {
 		want(t, r, 8)
 	}
 }
+
+func TestDecodeNaNAsJSON(t *testing.T) {
+	r := run(t, "", "dbc", "decode", "testdata/floats.dbc", "001##00000C07F000000000000F87F00000000", "--format", "json")
+	want(t, r, 0, `"physical":"NaN"`)
+}
