@@ -16,12 +16,21 @@ import (
 )
 
 type injectResult struct {
-	Interface  string             `json:"interface"`
-	Source     int                `json:"sourceFrames"`
-	Delivered  int                `json:"delivered"`
-	Faults     virtual.FaultStats `json:"faults"`
-	ErrorFrame string             `json:"errorFrame,omitempty"`
-	Malformed  int                `json:"malformed"`
+	Interface  string     `json:"interface"`
+	Source     int        `json:"sourceFrames"`
+	Delivered  int        `json:"delivered"`
+	Faults     faultStats `json:"faults"`
+	ErrorFrame string     `json:"errorFrame,omitempty"`
+	Malformed  int        `json:"malformed"`
+}
+
+// faultStats is virtual.FaultStats with JSON names.
+type faultStats struct {
+	Delivered  uint64 `json:"delivered"`
+	Dropped    uint64 `json:"dropped"`
+	Duplicated uint64 `json:"duplicated"`
+	Delayed    uint64 `json:"delayed"`
+	Corrupted  uint64 `json:"corrupted"`
 }
 
 func (r injectResult) Text() string {
@@ -154,6 +163,9 @@ produced. The same --seed gives the same faults.`,
 				}
 			}
 			res := injectResult{Interface: iface, Source: len(src)}
+			// Error and malformed frames are injected exactly once: the
+			// fault decisions of the source frames are already taken.
+			fb.SetFaults(virtual.Faults{})
 			if info != nil {
 				if err := fb.InjectError(ctx, *info); err != nil {
 					return err
@@ -201,7 +213,8 @@ produced. The same --seed gives the same faults.`,
 				}
 				_ = st.Record("frame", text, cli.ToJSON(&f))
 			}
-			res.Faults = fb.FaultStats()
+			fs := fb.FaultStats()
+			res.Faults = faultStats{fs.Delivered, fs.Dropped, fs.Duplicated, fs.Delayed, fs.Corrupted}
 			return a.emit("inject", res)
 		},
 	}

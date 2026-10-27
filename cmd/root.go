@@ -136,7 +136,7 @@ func Run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 		return errs.ExitFindings
 	}
 	var e *errs.Error
-	if !a.started {
+	if !a.started || isUsage(err) {
 		e = &errs.Error{Kind: errs.KindUsage, Code: errs.CodeInvalidInput, Message: err.Error(), Cause: err}
 		var typed *errs.Error
 		if errors.As(err, &typed) {
@@ -154,6 +154,24 @@ func Run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 		}
 	}
 	return errs.ExitCode(e.Kind)
+}
+
+// isUsage recognises cobra's own errors about the command line, which
+// can also arrive after flags were parsed (required flags are checked
+// late).
+func isUsage(err error) bool {
+	var typed *errs.Error
+	if errors.As(err, &typed) {
+		return false
+	}
+	msg := err.Error()
+	for _, p := range []string{"required flag", "accepts ", "requires at least", "unknown command", "unknown flag",
+		"unknown shorthand", "invalid argument", "flag needs an argument", "if any flags in the group"} {
+		if strings.Contains(msg, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // Execute runs canbusctl on the process's arguments, ending on SIGINT or

@@ -207,6 +207,9 @@ func TransmitCheck(iface string, yes bool, what string) error {
 	if err == nil {
 		kind = "a " + it.Kind + " interface"
 	}
+	if errors.Is(err, canbus.ErrInterfaceDown) {
+		return errs.New(errs.KindTransport, errs.CodeInterface, "%s: %v", iface, err)
+	}
 	if errors.Is(err, canbus.ErrUnsupported) && !strings.Contains(err.Error(), "not a CAN interface") {
 		return errs.New(errs.KindUnsupported, errs.CodeUnsupported, "%s: %v", iface, err)
 	}

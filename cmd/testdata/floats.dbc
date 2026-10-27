@@ -1,0 +1,10 @@
+VERSION ""
+BU_: A
+BO_ 1 Floats: 16 A
+ SG_ F32 : 0|32@1- (1,0) [0|0] "" A
+ SG_ F64 : 32|64@1- (1,0) [0|0] "" A
+ SG_ I : 96|8@1+ (1,0) [0|0] "" A
+BA_DEF_ SG_ "GenSigStartValue" INT 0 255;
+BA_ "GenSigStartValue" SG_ 1 I 5;
+SIG_VALTYPE_ 1 F32 : 1;
+SIG_VALTYPE_ 1 F64 : 2;
