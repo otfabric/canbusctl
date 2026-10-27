@@ -3,7 +3,7 @@ module github.com/otfabric/canbusctl
 go 1.23
 
 require (
-	github.com/otfabric/go-canbus v0.0.0-20261027205333-c242483dcb7f
+	github.com/otfabric/go-canbus v0.1.0
 	github.com/spf13/cobra v1.10.2
 )
 

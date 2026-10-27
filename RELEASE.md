@@ -8,11 +8,11 @@ version as its notes. Add the section before running it.
 
 ## v0.1.0
 
-**Date:** unreleased
+**Date:** 2026-10-27
 **Previous release:** none
 
 First release of canbusctl, the command-line toolkit of the OT Fabric CAN
-ecosystem, built on go-canbus.
+ecosystem, built on go-canbus v0.1.0.
 
 - Interfaces (Linux): `interfaces`, `info`, `configure` (bit rates, CAN FD,
   controller modes, restart, MTU), `up`, `down`.
