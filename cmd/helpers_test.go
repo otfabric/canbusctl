@@ -104,7 +104,7 @@ func golden(t *testing.T, name, got string) {
 	if err != nil {
 		t.Fatalf("%v (run go test ./cmd -update)", err)
 	}
-	if string(b) != got {
+	if strings.ReplaceAll(string(b), "\r\n", "\n") != got { // CRLF checkouts on Windows
 		t.Fatalf("%s differs:\n--- got\n%s\n--- want\n%s", name, got, b)
 	}
 }
