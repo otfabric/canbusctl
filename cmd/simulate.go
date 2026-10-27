@@ -170,7 +170,7 @@ is sent; on any other interface it needs --yes. --duration (default 10s),
 			if err != nil {
 				return err
 			}
-			defer t.Close()
+			defer func() { _ = t.Close() }()
 			ctx, cancel := bounded(cmd.Context(), limits.duration)
 			defer cancel()
 			pace := newPacer(limits.rate, 0)

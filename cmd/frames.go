@@ -137,7 +137,7 @@ or ",data"; several filters are ORed, or ANDed with --join.`,
 			if err != nil {
 				return err
 			}
-			defer bus.Close()
+			defer func() { _ = bus.Close() }()
 			sub, err := bus.Subscribe(canbus.WithQueueSize(65536))
 			if err != nil {
 				return err
@@ -320,7 +320,7 @@ without --yes.`,
 			if err != nil {
 				return err
 			}
-			defer t.Close()
+			defer func() { _ = t.Close() }()
 			ctx, cancel := bounded(cmd.Context(), limits.duration)
 			defer cancel()
 			pace := newPacer(limits.rate, gap)
@@ -457,7 +457,7 @@ keeps every field, including nanosecond timestamps.`,
 			if err != nil {
 				return err
 			}
-			defer bus.Close()
+			defer func() { _ = bus.Close() }()
 			sub, err := bus.Subscribe(canbus.WithQueueSize(65536))
 			if err != nil {
 				return err
@@ -466,7 +466,7 @@ keeps every field, including nanosecond timestamps.`,
 			if err != nil {
 				return errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot create %s: %w", out, err)
 			}
-			defer file.Close()
+			defer func() { _ = file.Close() }()
 			w, err := capture.NewWriter(file, format)
 			if err != nil {
 				return err
@@ -557,7 +557,7 @@ or as fast as allowed (--max-speed). Error frames are never sent. --max-frames,
 			if err != nil {
 				return err
 			}
-			defer t.Close()
+			defer func() { _ = t.Close() }()
 			opts := capture.ReplayOptions{Speed: speed, MaxFrames: limits.maxFrames, MaxDuration: limits.duration, Rate: limits.rate}
 			if maxSpeed {
 				opts.Speed = 0
@@ -668,7 +668,7 @@ func newStatsCmd(a *app) *cobra.Command {
 				if err != nil {
 					return err
 				}
-				defer bus.Close()
+				defer func() { _ = bus.Close() }()
 				sub, _ := bus.Subscribe(canbus.WithQueueSize(65536))
 				ctx, cancel := bounded(cmd.Context(), duration)
 				defer cancel()

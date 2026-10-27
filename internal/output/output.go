@@ -71,6 +71,7 @@ func Write(w io.Writer, f Format, command string, r Result) error {
 		if t, ok := r.(Tabular); ok {
 			return WriteTable(w, t.Headers(), t.Rows())
 		}
+	default:
 	}
 	s := strings.TrimSuffix(r.Text(), "\n")
 	_, err := io.WriteString(w, s+"\n")
@@ -96,9 +97,9 @@ func writeJSON(w io.Writer, v any) error {
 // WriteTable writes aligned columns.
 func WriteTable(w io.Writer, headers []string, rows [][]string) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, strings.Join(headers, "\t"))
+	_, _ = fmt.Fprintln(tw, strings.Join(headers, "\t"))
 	for _, r := range rows {
-		fmt.Fprintln(tw, strings.Join(r, "\t"))
+		_, _ = fmt.Fprintln(tw, strings.Join(r, "\t"))
 	}
 	return tw.Flush()
 }
@@ -107,8 +108,8 @@ func WriteTable(w io.Writer, headers []string, rows [][]string) error {
 // compact JSON object per line (JSON Lines) carrying schemaVersion and
 // type.
 type Stream struct {
-	w      io.Writer
-	f      Format
+	w io.Writer
+	f Format
 }
 
 // NewStream returns a record stream.

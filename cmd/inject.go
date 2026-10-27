@@ -141,7 +141,7 @@ produced. The same --seed gives the same faults.`,
 			}
 			// The fault stage: a private virtual bus with the faults.
 			fb := virtual.New(virtual.Config{Name: cli.Virtual, Seed: seed})
-			defer fb.Close()
+			defer func() { _ = fb.Close() }()
 			fb.SetFaults(virtual.Faults{Drop: drop, Duplicate: dup, Delay: delayP, DelayBy: delay, Corrupt: cor})
 			in, _ := fb.Open(virtual.WithFD())
 			outPort, _ := fb.Open(virtual.WithFD(), virtual.WithQueueSize(len(src)*2+malformed+16),
@@ -152,7 +152,7 @@ produced. The same --seed gives the same faults.`,
 				if err != nil {
 					return err
 				}
-				defer t.Close()
+				defer func() { _ = t.Close() }()
 				target = t
 			}
 			ctx, cancel := bounded(cmd.Context(), limits.duration)

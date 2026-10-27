@@ -144,7 +144,7 @@ func LoadDatabase(path string) (*candb.Database, []candb.Diagnostic, string, err
 
 // OpenTrace opens a capture file ("-" for stdin) of any supported format.
 func OpenTrace(path string, stdin io.Reader) (capture.Reader, func(), error) {
-	var r io.Reader = stdin
+	r := stdin
 	closer := func() {}
 	if path != "-" {
 		f, err := os.Open(path)
@@ -168,6 +168,7 @@ func TraceFormat(path, explicit string) (capture.Format, error) {
 		switch capture.Format(explicit) {
 		case capture.FormatCandump, capture.FormatJSONL, capture.FormatPCAP:
 			return capture.Format(explicit), nil
+		default:
 		}
 		return "", errs.Invalid("unknown trace format %q (candump, jsonl or pcap)", explicit)
 	}

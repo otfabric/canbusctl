@@ -352,7 +352,7 @@ also prints the flow control frames.`,
 			if err != nil {
 				return err
 			}
-			defer bus.Close()
+			defer func() { _ = bus.Close() }()
 			sub, _ := bus.Subscribe(canbus.WithQueueSize(65536))
 			ctx, cancel := bounded(cmd.Context(), duration)
 			defer cancel()

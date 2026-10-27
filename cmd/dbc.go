@@ -206,7 +206,7 @@ func newDBCValidateCmd(a *app) *cobra.Command {
 		RunE: func(_ *cobra.Command, args []string) error {
 			_, diags, _, err := cli.LoadDatabase(args[0])
 			var e *errs.Error
-			if err != nil && !(errors.As(err, &e) && e.Code == errs.CodeInvalidDatabase) {
+			if err != nil && (!errors.As(err, &e) || e.Code != errs.CodeInvalidDatabase) {
 				return err
 			}
 			r := validateResult{Database: args[0], Diagnostics: diags}

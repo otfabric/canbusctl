@@ -117,7 +117,7 @@ func (a *app) stream() *output.Stream { return output.NewStream(a.out, a.format)
 
 // warn writes a diagnostic line to stderr.
 func (a *app) warn(format string, args ...any) {
-	fmt.Fprintf(a.errOut, "canbusctl: "+format+"\n", args...)
+	_, _ = fmt.Fprintf(a.errOut, "canbusctl: "+format+"\n", args...)
 }
 
 // Run executes canbusctl with args and returns the exit code.
@@ -148,9 +148,9 @@ func Run(ctx context.Context, args []string, in io.Reader, out, errOut io.Writer
 	if a.format == output.JSON {
 		_ = output.WriteError(out, e)
 	} else {
-		fmt.Fprintf(errOut, "error: %s\n", e.Message)
+		_, _ = fmt.Fprintf(errOut, "error: %s\n", e.Message)
 		if e.Kind == errs.KindUsage {
-			fmt.Fprintln(errOut, "Run 'canbusctl --help' for usage.")
+			_, _ = fmt.Fprintln(errOut, "Run 'canbusctl --help' for usage.")
 		}
 	}
 	return errs.ExitCode(e.Kind)
