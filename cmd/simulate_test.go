@@ -45,7 +45,7 @@ func TestInject(t *testing.T) {
 	r = run(t, "", "inject", "--trace", "testdata/trace.log", "--drop", "1", "--format", "json")
 	want(t, r, 0, `"dropped": 3`, `"delivered": 0`)
 	r = run(t, "", "inject", "--frame", "123#0102", "--corrupt", "1", "--delay-probability", "1", "--delay", "5ms", "--seed", "3")
-	want(t, r, 0, "1 delayed, 1 corrupted")
+	want(t, r, 0, "1 delayed, 0 reordered, 1 corrupted")
 	want(t, run(t, "", "inject"), 3, "nothing to inject")
 	want(t, run(t, "", "inject", "--frame", "1#"), 3)
 	want(t, run(t, "", "inject", "--drop", "2", "--frame", "123#"), 3, "between 0 and 1")

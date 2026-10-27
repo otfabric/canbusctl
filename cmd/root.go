@@ -91,7 +91,7 @@ and diagnostics go to stderr. Exit codes: docs/exitcodes.md.`,
 	root.AddCommand(
 		newInterfacesCmd(a), newInfoCmd(a), newConfigureCmd(a), newUpDownCmd(a, true), newUpDownCmd(a, false),
 		newMonitorCmd(a), newSendCmd(a, false), newSendCmd(a, true), newRecordCmd(a), newReplayCmd(a), newStatsCmd(a),
-		newDBCCmd(a), newISOTPCmd(a), newSimulateCmd(a), newInjectCmd(a),
+		newDBCCmd(a), newISOTPCmd(a), newSimulateCmd(a), newInjectCmd(a), newTraceCmd(a), newBridgeCmd(a),
 		newVersionCmd(a), newCompletionCmd(),
 	)
 	return root

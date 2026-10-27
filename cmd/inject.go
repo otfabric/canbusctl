@@ -11,22 +11,23 @@ import (
 	"github.com/otfabric/canbusctl/internal/cli"
 	"github.com/otfabric/canbusctl/internal/errs"
 	"github.com/otfabric/go-canbus"
+	"github.com/otfabric/go-canbus/chaos"
 	"github.com/otfabric/go-canbus/virtual"
 	"github.com/spf13/cobra"
 )
 
 type injectResult struct {
-	Interface  string             `json:"interface"`
-	Source     int                `json:"sourceFrames"`
-	Delivered  int                `json:"delivered"`
-	Faults     virtual.FaultStats `json:"faults"`
-	ErrorFrame string             `json:"errorFrame,omitempty"`
-	Malformed  int                `json:"malformed"`
+	Interface  string      `json:"interface"`
+	Source     int         `json:"sourceFrames"`
+	Delivered  int         `json:"delivered"`
+	Faults     chaos.Stats `json:"faults"`
+	ErrorFrame string      `json:"errorFrame,omitempty"`
+	Malformed  int         `json:"malformed"`
 }
 
 func (r injectResult) Text() string {
-	s := fmt.Sprintf("%d source frames, %d delivered to %s: %d dropped, %d duplicated, %d delayed, %d corrupted",
-		r.Source, r.Delivered, r.Interface, r.Faults.Dropped, r.Faults.Duplicated, r.Faults.Delayed, r.Faults.Corrupted)
+	s := fmt.Sprintf("%d source frames, %d delivered to %s: %d dropped, %d duplicated, %d delayed, %d reordered, %d corrupted",
+		r.Source, r.Delivered, r.Interface, r.Faults.Dropped, r.Faults.Duplicated, r.Faults.Delayed, r.Faults.Reordered, r.Faults.Corrupted)
 	if r.ErrorFrame != "" {
 		s += "; error frame " + r.ErrorFrame
 	}
@@ -50,9 +51,7 @@ func newInjectCmd(a *app) *cobra.Command {
 	var (
 		iface, trace, errClass string
 		frames                 []string
-		drop, dup, delayP, cor float64
-		delay                  time.Duration
-		seed                   int64
+		faults                 faultFlags
 		malformed              int
 		yes                    bool
 		limits                 sendLimits
@@ -61,8 +60,9 @@ func newInjectCmd(a *app) *cobra.Command {
 		Use:   "inject",
 		Short: "Pass traffic through controlled faults onto a virtual test bus",
 		Long: `inject takes frames (--frame in cansend notation, or a --trace file) through
-a seeded fault stage — --drop, --duplicate, --delay-probability with --delay,
---corrupt (one payload bit flipped) — and delivers what survives:
+a seeded fault stage (the chaos bridge of go-canbus, as in "bridge") —
+--drop, --duplicate, --delay-probability with --delay, --reorder, --corrupt
+(one payload bit flipped) — and delivers what survives:
 
   --interface virtual  the frames are printed as a receiver on the in-process
                        virtual bus sees them; --error-frame (bus-off, passive,
@@ -79,10 +79,9 @@ error confinement and electrical faults need real hardware and are not
 produced. The same --seed gives the same faults.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			for _, p := range []float64{drop, dup, delayP, cor} {
-				if p < 0 || p > 1 {
-					return errs.Invalid("fault probabilities lie between 0 and 1")
-				}
+			cfg, err := faults.config(nil)
+			if err != nil {
+				return err
 			}
 			var info *canbus.ErrorInfo
 			if errClass != "" {
@@ -130,13 +129,21 @@ produced. The same --seed gives the same faults.`,
 			if err := cli.TransmitCheck(iface, yes, "inject"); err != nil {
 				return err
 			}
-			// The fault stage: a private virtual bus with the faults.
-			fb := virtual.New(virtual.Config{Name: cli.Virtual, Seed: seed})
-			defer func() { _ = fb.Close() }()
-			fb.SetFaults(virtual.Faults{Drop: drop, Duplicate: dup, Delay: delayP, DelayBy: delay, Corrupt: cor})
-			in, _ := fb.Open(virtual.WithFD())
-			outPort, _ := fb.Open(virtual.WithFD(), virtual.WithQueueSize(len(src)*2+malformed+16),
+			// The fault stage: a chaos bridge between two private virtual
+			// buses; error and malformed frames are injected after it.
+			srcBus := virtual.New(virtual.Config{Name: cli.Virtual})
+			defer func() { _ = srcBus.Close() }()
+			dstBus := virtual.New(virtual.Config{Name: cli.Virtual})
+			defer func() { _ = dstBus.Close() }()
+			in, _ := srcBus.Open(virtual.WithFD())
+			bridgeIn, _ := srcBus.Open(virtual.WithFD(), virtual.WithQueueSize(len(src)+16))
+			bridgeOut, _ := dstBus.Open(virtual.WithFD())
+			outPort, _ := dstBus.Open(virtual.WithFD(), virtual.WithQueueSize(len(src)*2+malformed+16),
 				virtual.WithFilters(canbus.FilterSet{ErrorMask: canbus.ErrClassAll}))
+			br, err := chaos.New(cfg)
+			if err != nil {
+				return errs.Invalid("%v", err)
+			}
 			var target canbus.Transport
 			if iface != cli.Virtual {
 				t, err := openTransport(iface, openOpts{autoFD: true})
@@ -148,17 +155,26 @@ produced. The same --seed gives the same faults.`,
 			}
 			ctx, cancel := bounded(cmd.Context(), limits.duration)
 			defer cancel()
+			bridgeDone := make(chan struct{})
+			go func() { _ = br.Run(ctx, bridgeIn, bridgeOut); close(bridgeDone) }()
 			for i := range src {
 				if err := in.Send(ctx, &src[i]); err != nil {
+					_ = bridgeIn.Close()
+					<-bridgeDone
 					return err
 				}
 			}
+			// Once the bridge has taken every source frame, closing its
+			// input ends it after the frame in hand (a reordered frame is
+			// flushed then).
+			for br.Stats().Received < uint64(len(src)) && ctx.Err() == nil {
+				time.Sleep(time.Millisecond)
+			}
+			_ = bridgeIn.Close()
+			<-bridgeDone
 			res := injectResult{Interface: iface, Source: len(src)}
-			// Error and malformed frames are injected exactly once: the
-			// fault decisions of the source frames are already taken.
-			fb.SetFaults(virtual.Faults{})
 			if info != nil {
-				if err := fb.InjectError(ctx, *info); err != nil {
+				if err := dstBus.InjectError(ctx, *info); err != nil {
 					return err
 				}
 				res.ErrorFrame = errClass
@@ -168,7 +184,7 @@ produced. The same --seed gives the same faults.`,
 				if i%2 == 1 {
 					bad = canbus.Frame{ID: 0x7FF, Flags: canbus.FlagFD, Len: 13} // not a CAN FD length
 				}
-				if err := fb.InjectRaw(ctx, bad); err != nil {
+				if err := dstBus.InjectRaw(ctx, bad); err != nil {
 					return err
 				}
 				res.Malformed++
@@ -177,7 +193,7 @@ produced. The same --seed gives the same faults.`,
 			pace := newPacer(limits.rate, 0)
 			for {
 				var f canbus.Frame
-				c, stop := context.WithTimeout(ctx, 100*time.Millisecond+delay)
+				c, stop := context.WithTimeout(ctx, 100*time.Millisecond)
 				err := outPort.Receive(c, &f)
 				stop()
 				if err != nil {
@@ -204,7 +220,7 @@ produced. The same --seed gives the same faults.`,
 				}
 				_ = st.Record("frame", text, cli.ToJSON(&f))
 			}
-			res.Faults = fb.FaultStats()
+			res.Faults = br.Stats()
 			return a.emit("inject", res)
 		},
 	}
@@ -212,15 +228,10 @@ produced. The same --seed gives the same faults.`,
 	f.StringVarP(&iface, "interface", "i", cli.Virtual, "\"virtual\", a vcan/vxcan interface, or another with --yes")
 	f.StringArrayVar(&frames, "frame", nil, "A frame in cansend notation (repeatable)")
 	f.StringVar(&trace, "trace", "", "Frames from a trace file")
-	f.Float64Var(&drop, "drop", 0, "Probability a frame is lost")
-	f.Float64Var(&dup, "duplicate", 0, "Probability a frame is delivered twice")
-	f.Float64Var(&delayP, "delay-probability", 0, "Probability a frame is held for --delay")
-	f.DurationVar(&delay, "delay", 10*time.Millisecond, "Hold time of delayed frames")
-	f.Float64Var(&cor, "corrupt", 0, "Probability one payload bit is flipped")
-	f.Int64Var(&seed, "seed", 1, "Seed of the fault generator")
 	f.StringVar(&errClass, "error-frame", "", "Inject an error frame (virtual bus only)")
 	f.IntVar(&malformed, "malformed", 0, "Inject this many malformed frames (virtual bus only)")
 	f.BoolVar(&yes, "yes", false, "Confirm transmission on a non-virtual interface")
 	addLimitFlags(c, &limits, 0)
+	faults.add(c)
 	return c
 }
