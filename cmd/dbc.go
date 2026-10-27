@@ -84,7 +84,7 @@ func (r inspectResult) Text() string {
 			if s.Signed {
 				sign = "signed"
 			}
-			fmt.Fprintf(&b, "  %-20s bit %3d len %2d %-13s %-8s ×%v %+v %s", s.Name, s.StartBit, s.Length, s.ByteOrder, sign, s.Factor, s.Offset, s.Unit)
+			fmt.Fprintf(&b, "  %-20s bit %3d len %2d %-13s %-8s ×%s %s %s", s.Name, s.StartBit, s.Length, s.ByteOrder, sign, human(s.Factor), signed(s.Offset), s.Unit)
 			if s.IsMultiplexer {
 				b.WriteString(" [multiplexer]")
 			}
@@ -160,6 +160,14 @@ func newDBCInspectCmd(a *app) *cobra.Command {
 	}
 	c.Flags().StringVarP(&message, "message", "m", "", "Show the signals of this message (name or hexadecimal identifier)")
 	return c
+}
+
+// signed formats an offset with its sign.
+func signed(f float64) string {
+	if f < 0 {
+		return human(f)
+	}
+	return "+" + human(f)
 }
 
 // findMessage finds a message by name or hexadecimal identifier.

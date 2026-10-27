@@ -65,10 +65,15 @@ func decodeSignals(sigs []candb.DecodedSignal) []decodedSignal {
 	return out
 }
 
+// human formats a physical value for people: at most 12 significant
+// digits, so 0.1 × 3 prints 0.3, not 0.30000000000000004. JSON output keeps
+// the full float64 and the exact raw value.
+func human(f float64) string { return strconv.FormatFloat(f, 'g', 12, 64) }
+
 func signalsText(sigs []decodedSignal) string {
 	var parts []string
 	for _, s := range sigs {
-		p := s.Name + "=" + strconv.FormatFloat(s.value, 'g', -1, 64)
+		p := s.Name + "=" + human(s.value)
 		if s.Unit != "" {
 			p += " " + s.Unit
 		}

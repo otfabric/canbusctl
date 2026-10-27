@@ -10,7 +10,7 @@ cmd/                    one file per command group (cobra)
   interfaces.go         interfaces, info, configure, up, down     → go-canbus/socketcan/link
   frames.go             monitor, send, send-fd, record, replay, stats → canbus.Bus, capture
   dbc.go                dbc inspect/validate/decode/encode/generate/convert → candb, dbc, kcd, codegen
-  isotp.go              isotp send/receive (isotp, socketcan.DialISOTP), monitor (listen-only reassembly)
+  isotp.go              isotp send/receive (isotp, socketcan.DialISOTP), monitor (listen-only isotp.Conn)
   simulate.go           deterministic traffic from a database
   inject.go             fault stage (virtual.Bus with seeded faults) in front of the target
   transport.go          opens an interface: socketcan.Open, or a port of the in-process virtual bus
@@ -37,7 +37,12 @@ Administrative commands need `--yes` regardless.
 isotp.ErrTimeout, candb.ErrRange, ...) to kinds and exit codes. cobra's own
 command-line errors are usage errors (2).
 
-**What is not in the library.** `isotp monitor` reassembles ISO-TP frames
-passively in canbusctl (`cmd/isotp.go`, `passive`), because go-canbus's
-connection always answers first frames with flow control; a listen-only mode
-in go-canbus would replace it.
+**Listen-only ISO-TP.** `isotp monitor` opens two go-canbus ISO-TP
+connections with `ListenOnly` (one per direction): they reassemble messages
+and never transmit.
+
+**Human numbers.** Text and table output print physical values with at most
+12 significant digits (`human` in `cmd/frames.go`); JSON keeps the full
+float64 and the raw value as an exact decimal string. `dbc encode` passes
+`signal=value` numbers to go-canbus as decimal text (`candb.PhysText`), so a
+64-bit raw value of a factor-1 signal is encoded exactly.

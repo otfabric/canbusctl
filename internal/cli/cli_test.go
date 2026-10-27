@@ -36,7 +36,7 @@ func TestParseAssignments(t *testing.T) {
 	if err != nil || len(in) != 3 {
 		t.Fatal(in, err)
 	}
-	if in["A"] != candb.Phys(1.5) || in["B"] != candb.Label("Second") || in["C"] != candb.Label("On") {
+	if in["A"] != candb.PhysText("1.5") || in["B"] != candb.Label("Second") || in["C"] != candb.Label("On") {
 		t.Fatal(in)
 	}
 	raw, err := ParseAssignments([]string{"A=0x10", "B=-3", "C=18446744073709551615"}, true)

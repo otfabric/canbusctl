@@ -4,6 +4,7 @@ package cmd
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -255,85 +256,25 @@ frames (--bs, --stmin). Use "isotp monitor" to observe without sending anything.
 	return c
 }
 
-// passive reassembles ISO-TP messages of one identifier without sending
-// flow control (listen-only).
-type passive struct {
-	off  int
-	buf  []byte
-	want int
-	sn   byte
-	on   bool
-}
-
-// feed processes one frame; it returns a complete message, or a note.
-func (p *passive) feed(data []byte) (msg []byte, note string) {
-	if len(data) <= p.off {
-		return nil, ""
-	}
-	d := data[p.off:]
-	switch d[0] >> 4 {
-	case 0:
-		l, start := int(d[0]&0x0F), 1
-		if l == 0 && len(d) > 2 {
-			l, start = int(d[1]), 2
-		}
-		if l == 0 || start+l > len(d) {
-			return nil, "malformed single frame"
-		}
-		p.on = false
-		return append([]byte(nil), d[start:start+l]...), ""
-	case 1:
-		if len(d) < 2 {
-			return nil, "malformed first frame"
-		}
-		l, start := int(d[0]&0x0F)<<8|int(d[1]), 2
-		if l == 0 && len(d) >= 6 {
-			l, start = int(uint32(d[2])<<24|uint32(d[3])<<16|uint32(d[4])<<8|uint32(d[5])), 6
-		}
-		if l > 1<<20 {
-			p.on = false
-			return nil, fmt.Sprintf("first frame announces %d bytes: ignored", l)
-		}
-		p.buf, p.want, p.sn, p.on = append([]byte(nil), d[start:]...), l, 1, true
-		if len(p.buf) >= l {
-			p.on = false
-			return p.buf[:l], ""
-		}
-		return nil, ""
-	case 2:
-		if !p.on {
-			return nil, ""
-		}
-		if d[0]&0x0F != p.sn {
-			p.on = false
-			return nil, fmt.Sprintf("sequence number %d, expected %d: message dropped", d[0]&0x0F, p.sn)
-		}
-		p.sn = (p.sn + 1) & 0x0F
-		p.buf = append(p.buf, d[1:]...)
-		if len(p.buf) >= p.want {
-			p.on = false
-			return p.buf[:p.want], ""
-		}
-	case 3:
-		if len(d) >= 3 {
-			return nil, fmt.Sprintf("flow control status %d bs %d stmin 0x%02X", d[0]&0x0F, d[1], d[2])
-		}
-	}
-	return nil, ""
+// watchedMessage is a message (or reception error) of one direction.
+type watchedMessage struct {
+	id   string
+	data []byte
+	err  error
 }
 
 func newISOTPMonitorCmd(a *app) *cobra.Command {
 	var (
 		o        isotpFlags
 		duration time.Duration
-		fcNotes  bool
 	)
 	c := &cobra.Command{
 		Use:   "monitor",
 		Short: "Observe ISO-TP transfers between --tx-id and --rx-id without transmitting",
 		Long: `monitor reassembles the messages in both directions of an ISO-TP connection
-from the frames on the bus (listen-only: it never sends flow control). --flow-control
-also prints the flow control frames.`,
+from the frames on the bus, with two listen-only ISO-TP connections of go-canbus:
+it never transmits (no flow control). Reception errors (wrong sequence number,
+N_Cr timeout) are printed as notes.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if o.kernel {
@@ -343,53 +284,66 @@ also prints the flow control frames.`,
 			if err != nil {
 				return err
 			}
-			fmtOf := canbus.ExactStandard
-			if cfg.ExtendedIDs {
-				fmtOf = canbus.ExactExtended
-			}
-			fs := canbus.FilterSet{Filters: []canbus.Filter{fmtOf(cfg.TxID), fmtOf(cfg.RxID)}}
-			bus, err := openBus(o.iface, openOpts{autoFD: true, filters: &fs})
+			cfg.ListenOnly = true
+			bus, err := openBus(o.iface, openOpts{autoFD: true})
 			if err != nil {
 				return err
 			}
 			defer func() { _ = bus.Close() }()
-			sub, _ := bus.Subscribe(canbus.WithQueueSize(65536))
+			// One listen-only connection per direction: the frames sent on
+			// --tx-id, and those sent on --rx-id.
+			fromTx, fromRx := cfg, cfg
+			fromTx.TxID, fromTx.RxID, fromTx.RxAddress = cfg.RxID, cfg.TxID, cfg.TxAddress
+			fromRx.TxID, fromRx.RxID, fromRx.RxAddress = cfg.TxID, cfg.RxID, cfg.RxAddress
 			ctx, cancel := bounded(cmd.Context(), duration)
 			defer cancel()
-			off := 0
-			if cfg.Addressing != isotp.Normal {
-				off = 1
-			}
-			streams := map[canbus.ID]*passive{cfg.TxID: {off: off}, cfg.RxID: {off: off}}
-			st := a.stream()
-			for {
-				f, err := sub.Receive(ctx)
+			msgs := make(chan watchedMessage, 64)
+			for _, dir := range []isotp.Config{fromTx, fromRx} {
+				conn, err := isotp.Dial(bus, dir)
 				if err != nil {
-					if ended(ctx, err) {
-						return nil
-					}
 					return err
 				}
-				p := streams[f.ID]
-				if p == nil {
-					continue
-				}
-				msg, note := p.feed(f.Payload())
-				id := idHex(f.ID, f.IsExtended())
-				switch {
-				case msg != nil:
-					m := isotpMessage{Len: len(msg), Data: hex.EncodeToString(msg), TxID: id}
-					if err := st.Record("message", fmt.Sprintf("%s: %d bytes: %s", id, m.Len, strings.ToUpper(m.Data)), m); err != nil {
+				defer func() { _ = conn.Close() }()
+				id := idHex(dir.RxID, dir.ExtendedIDs)
+				go func() {
+					for {
+						data, err := conn.Receive(ctx)
+						if err != nil && ctx.Err() != nil {
+							return
+						}
+						select {
+						case msgs <- watchedMessage{id: id, data: data, err: err}:
+						case <-ctx.Done():
+							return
+						}
+						if errors.Is(err, canbus.ErrClosed) {
+							return
+						}
+					}
+				}()
+			}
+			st := a.stream()
+			for {
+				select {
+				case <-ctx.Done():
+					return nil
+				case m := <-msgs:
+					if m.err != nil {
+						if errors.Is(m.err, canbus.ErrClosed) {
+							return m.err
+						}
+						_ = st.Record("note", m.id+": "+m.err.Error(), map[string]string{"txId": m.id, "note": m.err.Error()})
+						continue
+					}
+					rec := isotpMessage{Len: len(m.data), Data: hex.EncodeToString(m.data), TxID: m.id}
+					if err := st.Record("message", fmt.Sprintf("%s: %d bytes: %s", m.id, rec.Len, strings.ToUpper(rec.Data)), rec); err != nil {
 						return err
 					}
-				case note != "" && (fcNotes || !strings.HasPrefix(note, "flow control")):
-					_ = st.Record("note", id+": "+note, map[string]string{"txId": id, "note": note})
 				}
 			}
 		},
 	}
 	o.add(c, false)
 	c.Flags().DurationVar(&duration, "duration", 0, "Stop after this time")
-	c.Flags().BoolVar(&fcNotes, "flow-control", false, "Print flow control frames")
 	return c
 }

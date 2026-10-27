@@ -85,7 +85,8 @@ func ParseFilters(specs []string, join bool, errorMask bool) (canbus.FilterSet, 
 }
 
 // ParseAssignments parses "signal=value" pairs. A value is a number
-// (physical, or raw with raw), or a value description.
+// (physical, kept as decimal text so 64-bit values stay exact; raw with
+// raw), or a value description.
 func ParseAssignments(pairs []string, raw bool) (map[string]candb.Input, error) {
 	out := map[string]candb.Input{}
 	for _, p := range pairs {
@@ -107,8 +108,10 @@ func ParseAssignments(pairs []string, raw bool) (map[string]candb.Input, error) 
 				return nil, errs.Invalid("invalid raw value %q for %s (an integer)", val, name)
 			}
 		default:
-			if v, err := strconv.ParseFloat(val, 64); err == nil {
-				out[name] = candb.Phys(v)
+			if _, err := strconv.ParseFloat(val, 64); err == nil {
+				// Decimal text, not a float64: a 64-bit raw value of a
+				// factor-1 signal stays exact.
+				out[name] = candb.PhysText(val)
 			} else {
 				out[name] = candb.Label(strings.Trim(val, `"`))
 			}

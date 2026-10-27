@@ -541,8 +541,9 @@ Global Flags:
 
 ```text
 monitor reassembles the messages in both directions of an ISO-TP connection
-from the frames on the bus (listen-only: it never sends flow control). --flow-control
-also prints the flow control frames.
+from the frames on the bus, with two listen-only ISO-TP connections of go-canbus:
+it never transmits (no flow control). Reception errors (wrong sequence number,
+N_Cr timeout) are printed as notes.
 
 Usage:
   canbusctl isotp monitor [flags]
@@ -554,7 +555,6 @@ Flags:
       --duration duration   Stop after this time
       --extended-ids        29-bit identifiers
       --fd                  CAN FD frames
-      --flow-control        Print flow control frames
   -h, --help                help for monitor
   -i, --interface string    CAN interface, or "virtual" (required)
       --kernel              Use the Linux kernel's ISO-TP sockets instead of the userspace implementation

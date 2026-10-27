@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/otfabric/canbusctl/internal/cli"
+	"github.com/otfabric/go-canbus"
 	"github.com/otfabric/go-canbus/capture"
 )
 
@@ -59,3 +60,7 @@ func TestConfigureValidation(t *testing.T) {
 	r := run(t, "", "configure", "vcan0", "--fd", "--listen-only=false", "--dbitrate", "2000000", "--dsample-point", "75", "--restart-ms", "100", "--one-shot", "--berr-reporting", "--loopback")
 	want(t, r, 9)
 }
+
+type canbusFrame = canbus.Frame
+
+func parseForTest(s string) (canbus.Frame, error) { return cli.ParseFrame(s) }

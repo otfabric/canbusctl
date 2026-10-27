@@ -49,7 +49,7 @@ func TestISOTPExchange(t *testing.T) {
 	want(t, s, 0, "sent 1")
 	want(t, r, 0, "16 bytes: 0102030405060708090A0B0C0D0E0F10")
 	// Monitor observes a transfer between two other endpoints.
-	mon := append([]string{"isotp", "monitor", "--tx-id", "7E0", "--rx-id", "7E8", "--duration", "1s", "--flow-control"}, common...)
+	mon := append([]string{"isotp", "monitor", "--tx-id", "7E0", "--rx-id", "7E8", "--duration", "1s"}, common...)
 	resetVirtual()
 	_ = sharedVirtual()
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -75,7 +75,10 @@ func TestISOTPExchange(t *testing.T) {
 		t.Fatal("receiver", code)
 	}
 	m := <-mc
-	want(t, m, 0, "7E0: 100 bytes", "flow control status 0")
+	want(t, m, 0, "7E0: 100 bytes: 00010203")
+	if strings.Contains(m.out, "7E8:") {
+		t.Fatal("the flow control frames were taken for a message")
+	}
 }
 
 func TestISOTPErrors(t *testing.T) {
@@ -115,35 +118,37 @@ func TestISOTPErrors(t *testing.T) {
 	}
 }
 
-func TestPassiveReassembly(t *testing.T) {
-	p := &passive{}
-	steps := []struct {
-		in   []byte
-		msg  string
-		note string
-	}{
-		{[]byte{0x03, 1, 2, 3}, "\x01\x02\x03", ""},
-		{[]byte{0x00, 2, 9, 9}, "\x09\x09", ""}, // FD escape
-		{[]byte{0x00}, "", "malformed single frame"},
-		{[]byte{0x10, 0x09, 1, 2, 3, 4, 5, 6}, "", ""},
-		{[]byte{0x30, 0, 0}, "", "flow control status 0"},
-		{[]byte{0x21, 7, 8, 9}, "\x01\x02\x03\x04\x05\x06\x07\x08\x09", ""},
-		{[]byte{0x21, 1}, "", ""}, // no transfer in progress
-		{[]byte{0x10, 0x0A, 1, 2, 3, 4, 5, 6}, "", ""},
-		{[]byte{0x23, 1}, "", "sequence number 3, expected 1"},
-		{[]byte{0x10}, "", "malformed first frame"},
-		{[]byte{0x10, 0x00, 0x7F, 0, 0, 0, 1, 2}, "", "announces"},
-		{[]byte{0x10, 0x00, 0, 0, 0, 2, 7, 8}, "\x07\x08", ""},
-		{nil, "", ""},
+func TestISOTPMonitorNotes(t *testing.T) {
+	// A first frame followed by a consecutive frame with a wrong sequence
+	// number: the monitor reports it and never transmits.
+	resetVirtual()
+	vb := sharedVirtual()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	mc := make(chan result, 1)
+	go func() {
+		var o, e bytes.Buffer
+		code := Run(ctx, []string{"isotp", "monitor", "-i", "virtual", "--tx-id", "7E0", "--rx-id", "7E8", "--duration", "500ms", "--format", "json"}, strings.NewReader(""), &o, &e)
+		mc <- result{code, o.String(), e.String()}
+	}()
+	time.Sleep(100 * time.Millisecond)
+	spy, _ := vb.Open()
+	tx, _ := vb.Open()
+	for _, s := range []string{"7E0#1014000102030405", "7E0#2306070809"} {
+		f, _ := parseForTest(s)
+		_ = tx.Send(ctx, &f)
 	}
-	for i, s := range steps {
-		msg, note := p.feed(s.in)
-		if string(msg) != s.msg || !strings.Contains(note, s.note) || (s.note == "" && note != "") {
-			t.Fatalf("step %d: %q %q", i, msg, note)
+	m := <-mc
+	want(t, m, 0, `"type":"note"`, "sequence")
+	c2, stop := context.WithTimeout(ctx, 50*time.Millisecond)
+	defer stop()
+	for {
+		var f canbusFrame
+		if spy.Receive(c2, &f) != nil {
+			break
 		}
-	}
-	e := &passive{off: 1}
-	if msg, _ := e.feed([]byte{0xAA, 0x01, 0x42}); string(msg) != "\x42" {
-		t.Fatal("extended addressing")
+		if f.ID == 0x7E8 {
+			t.Fatal("the monitor transmitted", f)
+		}
 	}
 }
