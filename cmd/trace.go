@@ -222,7 +222,9 @@ func (r traceInfo) Text() string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
-func (r traceInfo) Headers() []string { return []string{"ID", "FRAMES", "RATE_HZ", "MIN_LEN", "MAX_LEN"} }
+func (r traceInfo) Headers() []string {
+	return []string{"ID", "FRAMES", "RATE_HZ", "MIN_LEN", "MAX_LEN"}
+}
 
 func (r traceInfo) Rows() [][]string {
 	var rows [][]string
