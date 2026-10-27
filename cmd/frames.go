@@ -118,6 +118,7 @@ type summary struct {
 func newMonitorCmd(a *app) *cobra.Command {
 	var (
 		iface, dbPath   string
+		output          string
 		filters         []string
 		join, errFrames bool
 		noFD            bool
@@ -129,7 +130,8 @@ func newMonitorCmd(a *app) *cobra.Command {
 		Short: "Print the frames of an interface as they arrive (passive)",
 		Long: `monitor receives frames and prints them, one line or JSON record each, until
 --count frames, --duration or Ctrl-C. It never transmits. --dbc decodes frames of
-known messages with a DBC or KCD database. Filters use candump notation:
+known messages with a DBC, KCD or ARXML database. --output also writes the
+frames to a trace file (format by extension, as record). Filters use candump notation:
 <id>:<mask> or <id>~<mask> (inverted), hexadecimal, with ",std", ",ext", ",rtr"
 or ",data"; several filters are ORed, or ANDed with --join.`,
 		Args: cobra.NoArgs,
@@ -153,6 +155,22 @@ or ",data"; several filters are ORed, or ANDed with --join.`,
 			if err != nil {
 				return err
 			}
+			var tw capture.Writer
+			if output != "" {
+				format, err := cli.TraceFormat(output, "")
+				if err != nil {
+					return err
+				}
+				file, err := os.Create(output)
+				if err != nil {
+					return errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot create %s: %w", output, err)
+				}
+				defer func() { _ = file.Close() }()
+				if tw, err = capture.NewWriter(file, format); err != nil {
+					return err
+				}
+				defer func() { _ = tw.Close() }()
+			}
 			ctx, cancel := bounded(cmd.Context(), duration)
 			defer cancel()
 			st := a.stream()
@@ -164,6 +182,11 @@ or ",data"; several filters are ORed, or ANDed with --join.`,
 						break
 					}
 					return err
+				}
+				if tw != nil {
+					if err := tw.Write(&f); err != nil {
+						return errs.New(errs.KindOutput, errs.CodeOutputFailed, "write %s: %w", output, err)
+					}
 				}
 				r, text := record(&f, db)
 				if err := st.Record("frame", text, r); err != nil {
@@ -185,7 +208,8 @@ or ",data"; several filters are ORed, or ANDed with --join.`,
 	f.BoolVar(&join, "join", false, "A frame must pass all filters (CAN_RAW_JOIN_FILTERS)")
 	f.BoolVar(&errFrames, "errors", false, "Also receive error frames")
 	f.BoolVar(&noFD, "no-fd", false, "Do not open the socket for CAN FD even when the interface carries it")
-	f.StringVar(&dbPath, "dbc", "", "Decode with this DBC or KCD database")
+	f.StringVar(&dbPath, "dbc", "", "Decode with this DBC, KCD or ARXML database")
+	f.StringVarP(&output, "output", "o", "", "Also write the frames to this trace file")
 	f.IntVarP(&count, "count", "n", 0, "Stop after this many frames (0: no limit)")
 	f.DurationVar(&duration, "duration", 0, "Stop after this time (0: until Ctrl-C)")
 	_ = c.MarkFlagRequired("interface")
@@ -452,9 +476,10 @@ func newRecordCmd(a *app) *cobra.Command {
 	)
 	c := &cobra.Command{
 		Use:   "record",
-		Short: "Record frames to a candump log, JSON Lines or pcap file (passive)",
+		Short: "Record frames to a candump log, JSON Lines, pcap, ASC or BLF file (passive)",
 		Long: `record writes received frames to --output, in the format of its extension
-(.log/.txt candump, .jsonl lossless JSON Lines, .pcap Wireshark) or --file-format,
+(.log/.txt candump, .jsonl lossless JSON Lines, .pcap Wireshark, .asc and
+.blf Vector; ASC/BLF times are local wall-clock times: set TZ) or --file-format,
 until --count, --duration or Ctrl-C. candump logs keep microseconds; JSON Lines
 keeps every field, including nanosecond timestamps.`,
 		Args: cobra.NoArgs,
@@ -500,7 +525,7 @@ keeps every field, including nanosecond timestamps.`,
 	f := c.Flags()
 	f.StringVarP(&iface, "interface", "i", "", "CAN interface, or \"virtual\" (required)")
 	f.StringVarP(&out, "output", "o", "", "Output file (required)")
-	f.StringVar(&ff, "file-format", "", "candump, jsonl or pcap (default: from the extension)")
+	f.StringVar(&ff, "file-format", "", "candump, jsonl, pcap, asc or blf (default: from the extension)")
 	f.StringArrayVar(&filters, "filter", nil, "Filter <id>:<mask> (repeatable)")
 	f.BoolVar(&errFrames, "errors", false, "Also record error frames")
 	f.BoolVar(&noFD, "no-fd", false, "Do not open the socket for CAN FD")
@@ -546,7 +571,7 @@ func newReplayCmd(a *app) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "replay <trace>",
 		Short: "Transmit a recorded trace (needs --yes on a non-virtual interface)",
-		Long: `replay sends the frames of a candump log, JSON Lines or pcap/pcapng file ("-":
+		Long: `replay sends the frames of a candump log, JSON Lines, pcap/pcapng, ASC or BLF file ("-":
 stdin) with their recorded timing (--speed 1), scaled (--speed 2 is twice as fast)
 or as fast as allowed (--max-speed). Error frames are never sent. --max-frames,
 --duration and --rate bound the transmission. The trace is streamed, not loaded.`,

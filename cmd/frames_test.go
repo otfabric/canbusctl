@@ -105,7 +105,7 @@ func writeTrace(t *testing.T, format capture.Format, frames []canbus.Frame) stri
 }
 
 func TestRecordAndReplay(t *testing.T) {
-	for _, ext := range []string{".log", ".jsonl", ".pcap"} {
+	for _, ext := range []string{".log", ".jsonl", ".pcap", ".asc", ".blf"} {
 		out := filepath.Join(t.TempDir(), "rec"+ext)
 		r := runWithTraffic(t, vehicleFrames(t), "record", "-i", "virtual", "-o", out, "-n", "6")
 		want(t, r, 0, "recorded 6 frames")
@@ -126,7 +126,7 @@ func TestRecordAndReplay(t *testing.T) {
 			t.Fatalf("%s: %d frames in the file", ext, n)
 		}
 	}
-	want(t, run(t, "", "record", "-i", "virtual", "-o", "x.log", "--file-format", "asc"), 3, "unknown trace format")
+	want(t, run(t, "", "record", "-i", "virtual", "-o", "x.log", "--file-format", "mf4"), 3, "unknown trace format")
 	want(t, run(t, "", "record", "-i", "virtual", "-o", filepath.Join(t.TempDir(), "no/x.log"), "-n", "1"), 3, "cannot create")
 	want(t, runWithTraffic(t, vehicleFrames(t), "record", "-i", "virtual", "-o", filepath.Join(t.TempDir(), "d.jsonl"), "--duration", "30ms", "--file-format", "jsonl"), 0, "recorded")
 

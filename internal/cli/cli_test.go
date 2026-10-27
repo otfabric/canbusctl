@@ -90,8 +90,19 @@ func TestTraceFormat(t *testing.T) {
 	if f, _ := TraceFormat("a.log", "pcap"); f != "pcap" {
 		t.Fatal(f)
 	}
-	if _, err := TraceFormat("a", "asc"); err == nil {
-		t.Fatal("asc")
+	for p, want := range map[string]string{"a.asc": "asc", "a.BLF": "blf"} {
+		if f, err := TraceFormat(p, ""); err != nil || string(f) != want {
+			t.Error(p, f, err)
+		}
+	}
+	if f, _ := TraceFormat("a", "blf"); f != "blf" {
+		t.Fatal(f)
+	}
+	if _, err := TraceFormat("a", "mf4"); err == nil {
+		t.Fatal("mf4")
+	}
+	if _, err := TraceFormat("a.pcapng", ""); err == nil {
+		t.Fatal("pcapng")
 	}
 	lines, _ := ReadLines(strings.NewReader("a\n\n# c\n b \n"))
 	if len(lines) != 2 || lines[1] != "b" {
