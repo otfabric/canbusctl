@@ -22,16 +22,17 @@ import (
 func newTraceCmd(a *app) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "trace",
-		Short: "Convert and inspect trace files (candump, JSON Lines, pcap/pcapng, ASC, BLF)",
+		Short: "Convert and inspect trace files (candump, JSON Lines, pcap/pcapng, ASC, BLF, TRC)",
 		Long: `The trace commands work on files only and never touch an interface.
 
 Readable: candump logs (.log/.txt), JSON Lines (.jsonl), pcap and pcapng,
-Vector ASC (.asc) and BLF (.blf), detected from the content. Writable: all
-of them but pcapng, chosen by the output's extension or --file-format.
+Vector ASC (.asc) and BLF (.blf), PEAK TRC (.trc, versions 1.0 to 2.1;
+written as 2.1), detected from the content. Writable: all of them but
+pcapng, chosen by the output's extension or --file-format.
 
-ASC and BLF hold local wall-clock times without a time zone: they are read
-and written in the local zone; set TZ (e.g. TZ=UTC) to match a file from
-another zone.`,
+ASC, BLF and TRC hold local wall-clock times without a time zone: they are
+read and written in the local zone; set TZ (e.g. TZ=UTC) to match a file
+from another zone.`,
 	}
 	c.AddCommand(newTraceConvertCmd(a), newTraceInfoCmd(a))
 	return c
@@ -65,9 +66,13 @@ type losses struct {
 
 func (l *losses) note(f *canbus.Frame, format capture.Format) {
 	switch format {
-	case capture.FormatASC, capture.FormatBLF:
+	case capture.FormatASC, capture.FormatBLF, capture.FormatTRC:
 		if f.IsError() {
-			l.errorClass++
+			// TRC keeps a protocol violation and the error counters.
+			info, _ := canbus.ParseError(f)
+			if format != capture.FormatTRC || info.Class&^(canbus.ErrClassProtocol|canbus.ErrClassCounters) != 0 {
+				l.errorClass++
+			}
 		}
 		if _, err := strconv.Atoi(f.Interface); f.Interface != "" && err != nil {
 			l.iface++
@@ -97,8 +102,8 @@ func (l *losses) list() []string {
 			out = append(out, fmt.Sprintf("%d frames: %s", n, what))
 		}
 	}
-	add(l.errorClass, "error class (ASC/BLF carry none; read back as protocol errors)")
-	add(l.iface, "interface name (ASC/BLF keep channel numbers, pcap none)")
+	add(l.errorClass, "error class (ASC/BLF carry none, TRC only protocol violations and counters; read back as protocol errors)")
+	add(l.iface, "interface name (ASC/BLF/TRC keep channel numbers, pcap none)")
 	add(l.echo, "own-transmission (echo) mark")
 	add(l.subMicro, "timestamp below microseconds")
 	return out
@@ -178,7 +183,7 @@ marks, sub-microsecond times) is reported, never silently dropped.`,
 		},
 	}
 	f := c.Flags()
-	f.StringVar(&ff, "file-format", "", "candump, jsonl, pcap, asc or blf (default: from the extension)")
+	f.StringVar(&ff, "file-format", "", "candump, jsonl, pcap, asc, blf or trc (default: from the extension)")
 	f.StringArrayVar(&filters, "filter", nil, "Keep frames matching <id>:<mask> (repeatable)")
 	f.BoolVar(&join, "join", false, "A frame must pass all filters")
 	f.BoolVar(&noErrors, "no-errors", false, "Drop error frames")

@@ -15,6 +15,11 @@ bus "virtual"), and are bounded by --rate, --max-frames and --duration.
 SocketCAN interfaces exist on Linux only; on macOS and Windows the database,
 trace and virtual-bus commands work and interface commands exit 8.
 
+Serial-line CAN adapters (CANable, CANtact, USBtin, LAWICEL) work on every
+OS as --interface slcan:<device> (slcan:/dev/ttyACM0, slcan:COM3) or
+slcan:tcp://host:port behind a serial server, opened at --slcan-bitrate;
+passive commands open them listen-only.
+
 Results go to stdout as text (default), a table or JSON (--format); progress
 and diagnostics go to stderr. Exit codes: docs/exitcodes.md.
 
@@ -33,19 +38,22 @@ Available Commands:
   interfaces  List the CAN interfaces of this host (Linux)
   isotp       Send, receive and monitor ISO-TP (ISO 15765-2) messages
   monitor     Print the frames of an interface as they arrive (passive)
-  record      Record frames to a candump log, JSON Lines, pcap, ASC or BLF file (passive)
+  record      Record frames to a candump log, JSON Lines, pcap, ASC, BLF or TRC file (passive)
   replay      Transmit a recorded trace (needs --yes on a non-virtual interface)
   send        Transmit classical CAN frames (needs --yes on a non-virtual interface)
   send-fd     Transmit CAN FD frames (needs --yes on a non-virtual interface)
   simulate    Generate deterministic traffic of a database's messages at their cycle times
   stats       Show interface counters and, with --duration, count live traffic per identifier (passive)
-  trace       Convert and inspect trace files (candump, JSON Lines, pcap/pcapng, ASC, BLF)
+  trace       Convert and inspect trace files (candump, JSON Lines, pcap/pcapng, ASC, BLF, TRC)
   up          Bring an interface up (Linux, CAP_NET_ADMIN, needs --yes)
   version     Print the version of canbusctl and go-canbus
 
 Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
-  -h, --help            help for canbusctl
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+  -h, --help                     help for canbusctl
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 
 Use "canbusctl [command] --help" for more information about a command.
 ```
@@ -62,7 +70,10 @@ Flags:
   -h, --help   help for interfaces
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl info
@@ -77,7 +88,10 @@ Flags:
   -h, --help   help for info
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl configure
@@ -109,7 +123,10 @@ Flags:
       --yes                   Confirm the change
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl up
@@ -125,7 +142,10 @@ Flags:
       --yes    Confirm the administrative change
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl down
@@ -141,7 +161,10 @@ Flags:
       --yes    Confirm the administrative change
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl monitor
@@ -170,7 +193,10 @@ Flags:
   -o, --output string        Also write the frames to this trace file
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl send
@@ -202,7 +228,10 @@ Flags:
       --yes                 Confirm transmission on a non-virtual interface
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl send-fd
@@ -234,7 +263,10 @@ Flags:
       --yes                 Confirm transmission on a non-virtual interface
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl record
@@ -242,7 +274,8 @@ Global Flags:
 ```text
 record writes received frames to --output, in the format of its extension
 (.log/.txt candump, .jsonl lossless JSON Lines, .pcap Wireshark, .asc and
-.blf Vector; ASC/BLF times are local wall-clock times: set TZ) or --file-format,
+.blf Vector, .trc PEAK; ASC/BLF/TRC times are local wall-clock times: set TZ)
+or --file-format,
 until --count, --duration or Ctrl-C. candump logs keep microseconds; JSON Lines
 keeps every field, including nanosecond timestamps.
 
@@ -253,7 +286,7 @@ Flags:
   -n, --count int            Stop after this many frames
       --duration duration    Stop after this time
       --errors               Also record error frames
-      --file-format string   candump, jsonl, pcap, asc or blf (default: from the extension)
+      --file-format string   candump, jsonl, pcap, asc, blf or trc (default: from the extension)
       --filter stringArray   Filter <id>:<mask> (repeatable)
   -h, --help                 help for record
   -i, --interface string     CAN interface, or "virtual" (required)
@@ -261,7 +294,10 @@ Flags:
   -o, --output string        Output file (required)
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl replay
@@ -288,7 +324,10 @@ Flags:
       --yes                  Confirm transmission on a non-virtual interface
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl stats
@@ -305,7 +344,10 @@ Flags:
   -i, --interface string    CAN interface, or "virtual" (required)
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl dbc
@@ -331,7 +373,10 @@ Flags:
   -h, --help   help for dbc
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 
 Use "canbusctl dbc [command] --help" for more information about a command.
 ```
@@ -349,7 +394,10 @@ Flags:
   -m, --message string   Show the signals of this message (name or hexadecimal identifier)
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl dbc validate
@@ -365,7 +413,10 @@ Flags:
       --strict   Treat warnings as errors
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl dbc decode
@@ -387,7 +438,10 @@ Flags:
       --trace string   Read frames from this trace file ("-": stdin)
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl dbc encode
@@ -408,7 +462,10 @@ Flags:
       --raw            Values are raw integers
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl dbc generate
@@ -430,7 +487,10 @@ Flags:
   -p, --package string   Go package name (default: from the file name)
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl dbc convert
@@ -450,7 +510,10 @@ Flags:
       --to string       Target format: dbc, kcd or json (required)
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl isotp
@@ -478,7 +541,10 @@ Flags:
   -h, --help   help for isotp
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 
 Use "canbusctl isotp [command] --help" for more information about a command.
 ```
@@ -516,7 +582,10 @@ Flags:
       --yes                 Confirm transmission on a non-virtual interface
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl isotp receive
@@ -550,7 +619,10 @@ Flags:
       --tx-id string        Identifier of the frames this side sends (hexadecimal)
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl isotp monitor
@@ -585,7 +657,10 @@ Flags:
       --tx-id string        Identifier of the frames this side sends (hexadecimal)
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl trace
@@ -594,12 +669,13 @@ Global Flags:
 The trace commands work on files only and never touch an interface.
 
 Readable: candump logs (.log/.txt), JSON Lines (.jsonl), pcap and pcapng,
-Vector ASC (.asc) and BLF (.blf), detected from the content. Writable: all
-of them but pcapng, chosen by the output's extension or --file-format.
+Vector ASC (.asc) and BLF (.blf), PEAK TRC (.trc, versions 1.0 to 2.1;
+written as 2.1), detected from the content. Writable: all of them but
+pcapng, chosen by the output's extension or --file-format.
 
-ASC and BLF hold local wall-clock times without a time zone: they are read
-and written in the local zone; set TZ (e.g. TZ=UTC) to match a file from
-another zone.
+ASC, BLF and TRC hold local wall-clock times without a time zone: they are
+read and written in the local zone; set TZ (e.g. TZ=UTC) to match a file
+from another zone.
 
 Usage:
   canbusctl trace [command]
@@ -612,7 +688,10 @@ Flags:
   -h, --help   help for trace
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 
 Use "canbusctl trace [command] --help" for more information about a command.
 ```
@@ -631,7 +710,7 @@ Usage:
   canbusctl trace convert <input> <output> [flags]
 
 Flags:
-      --file-format string   candump, jsonl, pcap, asc or blf (default: from the extension)
+      --file-format string   candump, jsonl, pcap, asc, blf or trc (default: from the extension)
       --filter stringArray   Keep frames matching <id>:<mask> (repeatable)
   -h, --help                 help for convert
       --join                 A frame must pass all filters
@@ -639,7 +718,10 @@ Flags:
       --no-errors            Drop error frames
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl trace info
@@ -654,7 +736,10 @@ Flags:
   -h, --help   help for info
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl simulate
@@ -686,7 +771,10 @@ Flags:
       --yes                      Confirm transmission on a non-virtual interface
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl inject
@@ -734,7 +822,10 @@ Flags:
       --yes                       Confirm transmission on a non-virtual interface
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl bridge
@@ -777,7 +868,10 @@ Flags:
       --yes                       Confirm transmission on a non-virtual interface
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl version
@@ -792,7 +886,10 @@ Flags:
   -h, --help   help for version
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```
 
 ## canbusctl completion
@@ -807,5 +904,8 @@ Flags:
   -h, --help   help for completion
 
 Global Flags:
-      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
 ```

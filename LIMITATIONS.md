@@ -1,7 +1,11 @@
 # Limitations
 
-- **Hardware:** only Linux SocketCAN. No drivers for PEAK, Kvaser, Vector,
-  slcan or other adapters, so no physical CAN on macOS or Windows (exit 8).
+- **Hardware:** Linux SocketCAN, and serial-line CAN (slcan) adapters on
+  every OS (`-i slcan:<device>`). No drivers for PEAK, Kvaser, Vector or
+  other adapters. slcan carries no error frames, error state indicator or
+  echo, and has no hardware filters (canbusctl filters in software); a
+  sent frame is not confirmed on the bus. Kernel ISO-TP (`--kernel`) needs
+  a SocketCAN interface.
 - **Fault injection is userspace emulation.** `inject` and `bridge` drop,
   duplicate, delay, reorder and corrupt frames before they are delivered (a
   real bus would reject a corrupted frame by CRC, and never reorders one

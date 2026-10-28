@@ -150,7 +150,7 @@ or ",data"; several filters are ORed, or ANDed with --join.`,
 					return err
 				}
 			}
-			bus, err := openBus(iface, openOpts{autoFD: !noFD, filters: &fs})
+			bus, err := openBus(iface, openOpts{autoFD: !noFD, filters: &fs, passive: true})
 			if err != nil {
 				return err
 			}
@@ -480,10 +480,11 @@ func newRecordCmd(a *app) *cobra.Command {
 	)
 	c := &cobra.Command{
 		Use:   "record",
-		Short: "Record frames to a candump log, JSON Lines, pcap, ASC or BLF file (passive)",
+		Short: "Record frames to a candump log, JSON Lines, pcap, ASC, BLF or TRC file (passive)",
 		Long: `record writes received frames to --output, in the format of its extension
 (.log/.txt candump, .jsonl lossless JSON Lines, .pcap Wireshark, .asc and
-.blf Vector; ASC/BLF times are local wall-clock times: set TZ) or --file-format,
+.blf Vector, .trc PEAK; ASC/BLF/TRC times are local wall-clock times: set TZ)
+or --file-format,
 until --count, --duration or Ctrl-C. candump logs keep microseconds; JSON Lines
 keeps every field, including nanosecond timestamps.`,
 		Args: cobra.NoArgs,
@@ -496,7 +497,7 @@ keeps every field, including nanosecond timestamps.`,
 			if err != nil {
 				return err
 			}
-			bus, err := openBus(iface, openOpts{autoFD: !noFD, filters: &fs})
+			bus, err := openBus(iface, openOpts{autoFD: !noFD, filters: &fs, passive: true})
 			if err != nil {
 				return err
 			}
@@ -529,7 +530,7 @@ keeps every field, including nanosecond timestamps.`,
 	f := c.Flags()
 	f.StringVarP(&iface, "interface", "i", "", "CAN interface, or \"virtual\" (required)")
 	f.StringVarP(&out, "output", "o", "", "Output file (required)")
-	f.StringVar(&ff, "file-format", "", "candump, jsonl, pcap, asc or blf (default: from the extension)")
+	f.StringVar(&ff, "file-format", "", "candump, jsonl, pcap, asc, blf or trc (default: from the extension)")
 	f.StringArrayVar(&filters, "filter", nil, "Filter <id>:<mask> (repeatable)")
 	f.BoolVar(&errFrames, "errors", false, "Also record error frames")
 	f.BoolVar(&noFD, "no-fd", false, "Do not open the socket for CAN FD")
@@ -707,7 +708,7 @@ func newStatsCmd(a *app) *cobra.Command {
 				}
 			}
 			if duration > 0 {
-				bus, err := openBus(iface, openOpts{autoFD: true, filters: &canbus.FilterSet{ErrorMask: canbus.ErrClassAll}})
+				bus, err := openBus(iface, openOpts{autoFD: true, filters: &canbus.FilterSet{ErrorMask: canbus.ErrClassAll}, passive: true})
 				if err != nil {
 					return err
 				}

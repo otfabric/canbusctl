@@ -295,7 +295,7 @@ N_Cr timeout) are printed as notes.`,
 				return err
 			}
 			cfg.ListenOnly = true
-			bus, err := openBus(o.iface, openOpts{autoFD: true})
+			bus, err := openBus(o.iface, openOpts{autoFD: true, passive: true})
 			if err != nil {
 				return err
 			}

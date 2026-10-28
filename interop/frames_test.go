@@ -143,11 +143,11 @@ func TestStackSendsCtlMonitors(t *testing.T) {
 	}
 }
 
-// TestRecordForPythonCan: canbusctl record writes .asc and .blf from a
+// TestRecordForPythonCan: canbusctl record writes .asc, .blf and .trc from a
 // stack's traffic; python-can reads them back (log-convert, contract 1.1).
 func TestRecordForPythonCan(t *testing.T) {
 	ifc := needVCAN(t)
-	for _, ext := range []string{".asc", ".blf", ".log"} {
+	for _, ext := range []string{".asc", ".blf", ".trc", ".log"} {
 		scenario(t, "pythoncan", "canbusctl record "+ext+", python-can reads", func(t *testing.T) {
 			c := caps(t, "pythoncan")
 			if !c.has("log-convert") {

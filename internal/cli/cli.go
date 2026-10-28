@@ -31,6 +31,10 @@ import (
 // Virtual is the interface name of canbusctl's in-process virtual bus.
 const Virtual = "virtual"
 
+// SlcanPrefix starts an interface that is a serial-line CAN adapter:
+// "slcan:/dev/ttyACM0", "slcan:COM3" or "slcan:tcp://host:port".
+const SlcanPrefix = "slcan:"
+
 // ParseID parses a hexadecimal identifier ("123", "0x18DAF110").
 func ParseID(s string, extended bool) (canbus.ID, error) {
 	t := strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(s), "0x"), "0X")
@@ -192,11 +196,11 @@ func OpenTrace(path string, stdin io.Reader) (capture.Reader, func(), error) {
 func TraceFormat(path, explicit string) (capture.Format, error) {
 	if explicit != "" {
 		switch capture.Format(explicit) {
-		case capture.FormatCandump, capture.FormatJSONL, capture.FormatPCAP, capture.FormatASC, capture.FormatBLF:
+		case capture.FormatCandump, capture.FormatJSONL, capture.FormatPCAP, capture.FormatASC, capture.FormatBLF, capture.FormatTRC:
 			return capture.Format(explicit), nil
 		default:
 		}
-		return "", errs.Invalid("unknown trace format %q (candump, jsonl, pcap, asc or blf)", explicit)
+		return "", errs.Invalid("unknown trace format %q (candump, jsonl, pcap, asc, blf or trc)", explicit)
 	}
 	switch f := capture.FormatFromPath(path); f {
 	case "", capture.FormatCandump:
@@ -226,6 +230,10 @@ func ReadLines(r io.Reader) ([]string, error) {
 func TransmitCheck(iface string, yes bool, what string) error {
 	if iface == Virtual || yes {
 		return nil
+	}
+	if strings.HasPrefix(iface, SlcanPrefix) {
+		return errs.New(errs.KindSafety, errs.CodeNeedsYes,
+			"%s would transmit on %s, a serial-line CAN adapter: CAN frames can move actuators. Check the bus, then repeat with --yes", what, iface)
 	}
 	it, err := link.Get(iface)
 	if err == nil && it.Virtual() {
