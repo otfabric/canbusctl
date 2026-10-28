@@ -41,11 +41,11 @@ build-all: ## Build for every release platform into ./release
 test: ## Run the tests with the race detector (vcan tests skip without vcan0)
 	@go test -count=1 -race ./...
 
-test-vcan: ## Run the tests on Linux, failing when vcan0 is missing
-	@CANBUS_REQUIRE_VCAN=1 go test -count=1 -race ./...
+test-vcan: ## Run the tests on Linux, failing when vcan0 or vcan1 is missing (one package at a time: they share the interfaces)
+	@CANBUS_REQUIRE_VCAN=1 go test -p 1 -count=1 -race ./...
 
 coverage: ## Whole-module coverage (coverage.out); fails below COVERAGE_MIN
-	@go test -count=1 -race -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./...
+	@go test -p 1 -count=1 -race -covermode=atomic -coverpkg=./... -coverprofile=coverage.out ./...
 	@total=$$(go tool cover -func=coverage.out | tail -1 | awk '{print $$3}' | tr -d %); \
 	echo "total $$total% (minimum $(COVERAGE_MIN)%)"; awk -v t=$$total -v m=$(COVERAGE_MIN) 'BEGIN { exit (t+0 < m+0) }'
 
@@ -77,7 +77,8 @@ vuln: ## govulncheck
 
 FUZZTIME ?= 15s
 fuzz: ## Fuzz the structured CLI inputs for FUZZTIME each
-	@go test -run='^$$' -fuzz='^FuzzParseFrame$$' -fuzztime=$(FUZZTIME) ./internal/cli
+	@for f in FuzzParseFrame FuzzParseAssignments FuzzParseFilters FuzzTraceFormat FuzzDatabaseKind; do \
+		go test -run='^$$' -fuzz="^$$f\$$" -fuzztime=$(FUZZTIME) ./internal/cli || exit 1; done
 	@go test -run='^$$' -fuzz='^FuzzParseAssignments$$' -fuzztime=$(FUZZTIME) ./internal/cli
 	@go test -run='^$$' -fuzz='^FuzzParseFilters$$' -fuzztime=$(FUZZTIME) ./internal/cli
 
