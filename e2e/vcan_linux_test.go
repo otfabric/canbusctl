@@ -5,10 +5,12 @@
 package e2e
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -143,7 +145,11 @@ func TestVCANBridgeProcesses(t *testing.T) {
 func TestChaosISOTPThroughBridge(t *testing.T) {
 	a, b := vcan0(t), vcan1(t)
 	payload := pattern(200)
-	for seed := 1; seed <= 6; seed++ {
+	seeds := 6
+	if testing.Short() {
+		seeds = 3
+	}
+	for seed := 1; seed <= seeds; seed++ {
 		for _, all := range []bool{false, true} {
 			name := fmt.Sprintf("seed %d", seed)
 			faults := []string{"--drop", "0.005", "--duplicate", "0.01", "--delay-probability", "0.05", "--delay", "3ms"}
@@ -192,4 +198,50 @@ func pattern(n int) []byte {
 		b[i] = byte(i % 251)
 	}
 	return b
+}
+
+// proc is a canbusctl process in the background.
+type proc struct {
+	cmd  *exec.Cmd
+	o, e bytes.Buffer
+	done chan struct{}
+	code int
+}
+
+func start(t *testing.T, args ...string) *proc {
+	t.Helper()
+	p := &proc{done: make(chan struct{})}
+	p.cmd = exec.Command(bin, args...)
+	p.cmd.Stdout, p.cmd.Stderr = &p.o, &p.e
+	if err := p.cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	go func() {
+		if ee, ok := p.cmd.Wait().(*exec.ExitError); ok {
+			p.code = ee.ExitCode()
+		}
+		close(p.done)
+	}()
+	t.Cleanup(func() {
+		select {
+		case <-p.done:
+		default:
+			_ = p.cmd.Process.Kill()
+			<-p.done
+		}
+	})
+	time.Sleep(300 * time.Millisecond) // bound by then
+	return p
+}
+
+func (p *proc) wait(t *testing.T, d time.Duration) result {
+	t.Helper()
+	select {
+	case <-p.done:
+	case <-time.After(d):
+		_ = p.cmd.Process.Kill()
+		<-p.done
+		t.Fatalf("did not return within %v: %s %s", d, p.o.String(), p.e.String())
+	}
+	return result{p.code, p.o.String(), p.e.String()}
 }

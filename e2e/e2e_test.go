@@ -23,7 +23,9 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	bin = filepath.Join(dir, "canbusctl")
-	if out, err := exec.Command("go", "build", "-race", "-o", bin, "..").CombinedOutput(); err != nil {
+	if v := os.Getenv("CANBUSCTL_BIN"); v != "" {
+		bin = v // a prebuilt binary (the microVM has no writable Go cache)
+	} else if out, err := exec.Command("go", "build", "-race", "-o", bin, "..").CombinedOutput(); err != nil {
 		// -race needs cgo; fall back to a plain build.
 		if out2, err2 := exec.Command("go", "build", "-o", bin, "..").CombinedOutput(); err2 != nil {
 			fmt.Fprintf(os.Stderr, "build: %v\n%s\n%s", err2, out, out2)
@@ -70,52 +72,6 @@ func want(t *testing.T, r result, code int, contains ...string) {
 			t.Fatalf("output lacks %q\nstdout: %s\nstderr: %s", c, r.out, r.err)
 		}
 	}
-}
-
-// proc is a canbusctl process in the background.
-type proc struct {
-	cmd  *exec.Cmd
-	o, e bytes.Buffer
-	done chan struct{}
-	code int
-}
-
-func start(t *testing.T, args ...string) *proc {
-	t.Helper()
-	p := &proc{done: make(chan struct{})}
-	p.cmd = exec.Command(bin, args...)
-	p.cmd.Stdout, p.cmd.Stderr = &p.o, &p.e
-	if err := p.cmd.Start(); err != nil {
-		t.Fatal(err)
-	}
-	go func() {
-		if ee, ok := p.cmd.Wait().(*exec.ExitError); ok {
-			p.code = ee.ExitCode()
-		}
-		close(p.done)
-	}()
-	t.Cleanup(func() {
-		select {
-		case <-p.done:
-		default:
-			_ = p.cmd.Process.Kill()
-			<-p.done
-		}
-	})
-	time.Sleep(300 * time.Millisecond) // bound by then
-	return p
-}
-
-func (p *proc) wait(t *testing.T, d time.Duration) result {
-	t.Helper()
-	select {
-	case <-p.done:
-	case <-time.After(d):
-		_ = p.cmd.Process.Kill()
-		<-p.done
-		t.Fatalf("did not return within %v: %s %s", d, p.o.String(), p.e.String())
-	}
-	return result{p.code, p.o.String(), p.e.String()}
 }
 
 // decodeSignals returns the decoded signals of each frame of a trace.

@@ -154,11 +154,8 @@ func TestRecordForPythonCan(t *testing.T) {
 				skipf(t, "pythoncan has no log-convert (contract 1.1)")
 			}
 			var want []canbus.Frame
-			var src []byte
 			for _, name := range []string{"standard", "extended"} {
-				b := fixture(t, "frames/"+name+".jsonl")
-				want = append(want, frames(t, b)...)
-				src = append(src, b...)
+				want = append(want, frames(t, fixture(t, "frames/"+name+".jsonl"))...)
 			}
 			work := workDir(t)
 			rec := ctlStart(t, "record", "-i", ifc, "-o", filepath.Join(work, "ctl"+ext), "-n", strconv.Itoa(len(want)), "--duration", "60s")

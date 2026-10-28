@@ -489,7 +489,7 @@ and initial values (dropped, reported as warnings on stderr).`,
 			case "kcd":
 				diags, err := kcd.Write(&buf, db)
 				for _, d := range diags {
-					fmt.Fprintln(a.errOut, d.String())
+					_, _ = fmt.Fprintln(a.errOut, d.String())
 				}
 				if err != nil {
 					return errs.New(errs.KindUnsupported, errs.CodeUnsupported, "%v", err)

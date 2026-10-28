@@ -52,8 +52,9 @@ coverage: ## Whole-module coverage (coverage.out); fails below COVERAGE_MIN
 e2e: ## End-to-end tests of the built binary (Linux: vcan0 and vcan1 for the process, kernel ISO-TP and chaos tests)
 	@go test -p 1 -count=1 -v ./e2e
 
-interop: ## Interop tests against the canbus-interop images (Docker, vcan0; CANBUS_INTEROP_REPORT=file for the matrix)
-	@go test -tags interop -p 1 -count=1 -timeout 30m -v ./interop
+interop: ## Interop tests against the canbus-interop images (Docker, vcan0); the matrix goes to bin/interop-report.json
+	@mkdir -p $(BIN_DIR)
+	@CANBUS_INTEROP_REPORT=$${CANBUS_INTEROP_REPORT:-$(CURDIR)/$(BIN_DIR)/interop-report.json} go test -tags interop -p 1 -count=1 -timeout 30m -v ./interop
 
 cover: coverage ## Open the coverage report
 	@go tool cover -html=coverage.out
