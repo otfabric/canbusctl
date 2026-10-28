@@ -136,4 +136,17 @@ func TestVCANKernelISOTP(t *testing.T) {
 	s := run(t, "", "isotp", "send", "-i", ifc, "--tx-id", "7E0", "--rx-id", "7E8", "--size", "300")
 	want(t, s, 0, "sent 1")
 	want(t, <-rc, 0, "300 bytes")
+
+	// Kernel sender, userspace receiver granting blocks of 4: --fc-delay
+	// keeps each flow control behind the kernel's echo of its last frame.
+	go func() {
+		var o, e bytes.Buffer
+		code := Run(ctx, []string{"isotp", "receive", "-i", ifc, "--tx-id", "7E8", "--rx-id", "7E0", "--bs", "4", "--fc-delay", "200us",
+			"-n", "3", "--timeout", "10s"}, strings.NewReader(""), &o, &e)
+		rc <- result{code, o.String(), e.String()}
+	}()
+	time.Sleep(200 * time.Millisecond)
+	s = run(t, "", "isotp", "send", "-i", ifc, "--kernel", "--tx-id", "7E0", "--rx-id", "7E8", "--size", "2000", "-n", "3")
+	want(t, s, 0, "sent 3")
+	want(t, <-rc, 0, "2000 bytes")
 }

@@ -89,7 +89,7 @@ func TestTransmitSafety(t *testing.T) {
 
 func writeTrace(t *testing.T, format capture.Format, frames []canbus.Frame) string {
 	t.Helper()
-	ext := map[capture.Format]string{capture.FormatCandump: ".log", capture.FormatJSONL: ".jsonl", capture.FormatPCAP: ".pcap"}[format]
+	ext := map[capture.Format]string{capture.FormatCandump: ".log", capture.FormatJSONL: ".jsonl", capture.FormatPCAP: ".pcap", capture.FormatASC: ".asc", capture.FormatBLF: ".blf"}[format]
 	p := filepath.Join(t.TempDir(), "t"+ext)
 	f, _ := os.Create(p)
 	w, _ := capture.NewWriter(f, format)
