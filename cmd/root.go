@@ -17,6 +17,7 @@ import (
 
 	"github.com/otfabric/canbusctl/internal/errs"
 	"github.com/otfabric/canbusctl/internal/output"
+	"github.com/otfabric/go-canbus/slcan"
 	"github.com/spf13/cobra"
 )
 
@@ -70,6 +71,11 @@ bus "virtual"), and are bounded by --rate, --max-frames and --duration.
 SocketCAN interfaces exist on Linux only; on macOS and Windows the database,
 trace and virtual-bus commands work and interface commands exit 8.
 
+Serial-line CAN adapters (CANable, CANtact, USBtin, LAWICEL) work on every
+OS as --interface slcan:<device> (slcan:/dev/ttyACM0, slcan:COM3) or
+slcan:tcp://host:port behind a serial server, opened at --slcan-bitrate;
+passive commands open them listen-only.
+
 Results go to stdout as text (default), a table or JSON (--format); progress
 and diagnostics go to stderr. Exit codes: docs/exitcodes.md.`,
 		SilenceUsage:  true,
@@ -81,6 +87,16 @@ and diagnostics go to stderr. Exit codes: docs/exitcodes.md.`,
 			}
 			a.format = f
 			a.started = true
+			br, _ := cmd.Flags().GetInt("slcan-bitrate")
+			dbr, _ := cmd.Flags().GetInt("slcan-data-bitrate")
+			baud, _ := cmd.Flags().GetInt("slcan-baud")
+			if _, ok := slcan.Bitrates[br]; br != 0 && !ok {
+				return errs.Invalid("--slcan-bitrate %d: one of 10000, 20000, 50000, 83300, 100000, 125000, 250000, 500000, 750000, 1000000 or 0 (keep the adapter's)", br)
+			}
+			if _, ok := slcan.DataBitrates[dbr]; dbr != 0 && !ok {
+				return errs.Invalid("--slcan-data-bitrate %d: 2000000, 5000000 or 0", dbr)
+			}
+			setSlcan(slcanFlags{bitrate: br, dataBitrate: dbr, baud: baud})
 			return nil
 		},
 	}
@@ -88,6 +104,9 @@ and diagnostics go to stderr. Exit codes: docs/exitcodes.md.`,
 	_ = root.RegisterFlagCompletionFunc("format", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 		return []string{"text\thuman-readable", "json\tversioned JSON", "table\taligned columns"}, cobra.ShellCompDirectiveNoFileComp
 	})
+	root.PersistentFlags().Int("slcan-bitrate", 500000, "Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's)")
+	root.PersistentFlags().Int("slcan-data-bitrate", 0, "CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none")
+	root.PersistentFlags().Int("slcan-baud", 115200, "Serial baud rate of an slcan adapter (USB adapters ignore it)")
 	root.AddCommand(
 		newInterfacesCmd(a), newInfoCmd(a), newConfigureCmd(a), newUpDownCmd(a, true), newUpDownCmd(a, false),
 		newMonitorCmd(a), newSendCmd(a, false), newSendCmd(a, true), newRecordCmd(a), newReplayCmd(a), newStatsCmd(a),

@@ -12,7 +12,8 @@ test under faults. Built on
 canbusctl monitor -i can0 --dbc vehicle.dbc                 # watch and decode, passively
 canbusctl dbc encode vehicle.dbc Engine Speed=1500 Gear=Second
 canbusctl send -i vcan0 123#DEADBEEF                         # vcan: no confirmation needed
-canbusctl record -i can0 -o trip.blf --duration 10m          # .log .jsonl .pcap .asc .blf
+canbusctl record -i can0 -o trip.blf --duration 10m          # .log .jsonl .pcap .asc .blf .trc
+canbusctl monitor -i slcan:/dev/ttyACM0 --slcan-bitrate 250000 # a CANable on any OS, listen-only
 canbusctl trace convert trip.blf trip.asc                    # reports what ASC cannot keep
 canbusctl replay trip.blf -i vcan0 --speed 2
 canbusctl dbc convert system.arxml --to kcd -o system.kcd
@@ -30,7 +31,7 @@ canbusctl dbc generate vehicle.dbc -o vehicle/vehicle.go
 | Frames | `monitor` (`-o` also records), `record`, `stats` | never |
 | | `send`, `send-fd`, `replay` | yes |
 | Databases | `dbc inspect`, `validate`, `decode`, `encode`, `generate`, `convert` (DBC, KCD, ARXML → DBC, KCD, JSON) | never (no interface) |
-| Traces | `trace convert`, `trace info` (candump, JSON Lines, pcap/pcapng, ASC, BLF) | never (no interface) |
+| Traces | `trace convert`, `trace info` (candump, JSON Lines, pcap/pcapng, ASC, BLF, PEAK TRC) | never (no interface) |
 | ISO-TP | `isotp monitor` | never |
 | | `isotp receive` | flow control frames only |
 | | `isotp send` | yes |
@@ -48,10 +49,12 @@ CAN frames can move brakes, drives and power electronics. canbusctl is
 **passive by default** and conservative when it is not:
 
 - `monitor`, `record`, `stats`, `isotp monitor` and all `dbc` commands never
-  transmit.
+  transmit; on a serial-line CAN adapter they open it listen-only ("L"), so
+  the adapter does not even acknowledge frames.
 - Every transmitting command refuses to send on an interface that is not
   virtual — not `vcan`, `vxcan` or the in-process bus `virtual` — unless
-  `--yes` is given (exit 9). The kind is read from the kernel (rtnetlink).
+  `--yes` is given (exit 9). The kind is read from the kernel (rtnetlink);
+  a serial-line CAN adapter (`slcan:`) always needs `--yes`.
 - Transmissions are bounded: `--max-frames` (default 10000), `--duration`,
   `--rate`; `simulate` always has a duration (default 10 s).
 - `up`, `down` and `configure` need `--yes` and CAP_NET_ADMIN.
@@ -66,11 +69,17 @@ CAN frames can move brakes, drives and power electronics. canbusctl is
 | SocketCAN interfaces (`interfaces`, `monitor -i can0`, `send`, ...) | ✓ | exit 8 | exit 8 |
 | Kernel ISO-TP (`--kernel`) | ✓ (can-isotp module) | exit 8 | exit 8 |
 | Userspace ISO-TP | ✓ | on `virtual` | on `virtual` |
-| `dbc` commands, traces (candump, JSON Lines, pcap, pcapng, ASC, BLF) | ✓ | ✓ | ✓ |
+| Serial-line CAN adapters (`-i slcan:/dev/ttyACM0`, `slcan:COM3`, `slcan:tcp://host:port`) | ✓ | ✓ | ✓ |
+| `dbc` commands, traces (candump, JSON Lines, pcap, pcapng, ASC, BLF, TRC) | ✓ | ✓ | ✓ |
 | In-process virtual bus (`-i virtual`: simulate, inject, replay) | ✓ | ✓ | ✓ |
 
-There is no hardware adapter support beyond SocketCAN (no PEAK, Kvaser, Vector
-or slcan drivers on macOS/Windows): see [LIMITATIONS.md](LIMITATIONS.md).
+Serial-line CAN (slcan, LAWICEL ASCII) adapters such as the CANable,
+CANtact, USBtin and LAWICEL CANUSB work on every OS without a kernel driver:
+`--slcan-bitrate` (default 500000; 0 keeps the adapter's),
+`--slcan-data-bitrate` (CAN FD data phase, CANable 2.0) and `--slcan-baud`.
+slcan has no error frames, error state indicator or hardware filters
+(`--filter` is applied in software). Other adapters (PEAK, Kvaser, Vector)
+are not supported: see [LIMITATIONS.md](LIMITATIONS.md).
 
 ## Install
 
@@ -89,7 +98,7 @@ canbusctl monitor -i vcan0 &
 canbusctl send-fd -i vcan0 123##1DEADBEEF
 ```
 
-ASC and BLF files hold local wall-clock times without a time zone: canbusctl
+ASC, BLF and TRC files hold local wall-clock times without a time zone: canbusctl
 reads and writes them in the local zone. Set `TZ` (e.g. `TZ=UTC`) to match a
 file recorded elsewhere.
 

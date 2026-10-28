@@ -6,6 +6,38 @@ with the version bump). It computes the tag, builds the binaries for linux
 publishes the GitHub release with the section of this file that matches the
 version as its notes. Add the section before running it.
 
+## v0.3.0
+
+**Date:** 2026-10-28
+**Previous release:** v0.2.2
+
+canbusctl on go-canbus v0.3.0: serial-line CAN adapters on every OS and
+PEAK TRC traces.
+
+- Serial-line CAN (slcan, LAWICEL ASCII) adapters — CANable, CANtact,
+  USBtin, LAWICEL CANUSB — on Linux, macOS and Windows without a kernel
+  driver: `--interface slcan:/dev/ttyACM0` (or `slcan:COM3`), and
+  `slcan:tcp://host:port` for an adapter behind a serial server. Every
+  command that takes an interface accepts it, including `bridge` (a
+  SocketCAN interface ↔ an adapter). New global flags `--slcan-bitrate`
+  (default 500000; 0 keeps the adapter's), `--slcan-data-bitrate` (CAN FD
+  data phase: 2000000 or 5000000, CANable 2.0) and `--slcan-baud`.
+- Safety: `monitor`, `record`, `stats` and `isotp monitor` open an adapter
+  listen-only ("L"): it neither transmits nor acknowledges frames.
+  Transmitting on an slcan adapter always needs `--yes` (exit 9).
+- slcan has no error frames, error state indicator, echo or hardware
+  filters; `--filter` is applied in software.
+- PEAK TRC (`.trc`, versions 1.0 to 2.1 read, 2.1 written) wherever traces
+  are read or written: `record`, `replay`, `monitor -o`, `trace convert`
+  and `trace info`, `dbc decode --trace`, `inject --trace`. `trace convert`
+  reports error classes TRC cannot keep (it keeps protocol violations and
+  error counters).
+- Tests: an end-to-end test drives canbusctl against the Linux kernel's
+  slcan driver (two linked ptys, the driver on one, canbusctl on the
+  other; both directions, recorded to TRC) in the Kernels microVMs; command
+  tests against a TCP adapter emulation check the setup commands
+  (bit rates, listen-only), `--yes` and software filters.
+
 ## v0.2.2
 
 **Date:** 2026-10-28

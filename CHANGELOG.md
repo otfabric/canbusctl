@@ -3,6 +3,14 @@
 All notable changes are listed here; release notes are in
 [RELEASE.md](RELEASE.md).
 
+## v0.3.0 (2026-10-28)
+
+Serial-line CAN adapters on every OS: `--interface slcan:<device>` or
+`slcan:tcp://host:port`, `--slcan-bitrate`, `--slcan-data-bitrate`,
+`--slcan-baud`; passive commands open them listen-only, transmitting needs
+`--yes`, filters run in software. PEAK TRC traces wherever traces are read
+or written. Built on go-canbus v0.3.0.
+
 ## v0.2.2 (2026-10-28)
 
 Built on go-canbus v0.2.2: `monitor`, `record`, `stats` and the ISO-TP

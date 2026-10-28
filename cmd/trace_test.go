@@ -38,7 +38,7 @@ func TestTraceConvertChain(t *testing.T) {
 	src := writeTrace(t, capture.FormatCandump, vehicleFrames(t))
 	dir := t.TempDir()
 	in := src
-	for _, ext := range []string{".jsonl", ".pcap", ".asc", ".blf", ".log"} {
+	for _, ext := range []string{".jsonl", ".pcap", ".asc", ".blf", ".trc", ".log"} {
 		out := filepath.Join(dir, "c"+ext)
 		r := run(t, "", "trace", "convert", in, out)
 		want(t, r, 0, "3 frames read, 3 written")
