@@ -9,7 +9,7 @@ changes only with an incompatible change. Schemas:
 
 ## Results
 
-Commands with one result (interfaces, info, configure, up, down, send, send-fd,
+Commands with one result (interfaces, info, configure, up, down, send, send-fd, xl send,
 record, replay, stats, dbc inspect/validate/encode, isotp send, trace
 convert/info, simulate, inject, bridge, version) write one indented document:
 
@@ -44,7 +44,8 @@ with `schemaVersion` and `type`:
 | `frame` | the frame fields above, plus `timestamp` (seconds with microseconds, as a string), `interface`, `echo`; decoded frames add `message` and `signals` (`name`, `raw` as an exact decimal string, `physical`, `unit`, `label`) or `decodeError`; error frames add `errorInfo` |
 | `message` | ISO-TP: `len`, `data` (hex), `txId` (isotp monitor) |
 | `note` | isotp monitor: `txId`, `note` |
-| `summary` | the end of monitor (`frames`, `dropped`), simulate, replay `--print` |
+| `frame` with `"kind": "xl"` | xl monitor's CAN XL frames: `priority`, `priorityHex`, `vcid`, `sec`, `rrs`, `sdt`, `af`, `len` (1..2048), `data`, `timestamp`, `interface`, `echo` (its CAN and CAN FD frames are ordinary `frame` records) |
+| `summary` | the end of monitor (`frames`, `dropped`), xl monitor (also `xl`: the CAN XL frames), simulate, replay `--print` |
 
 ```json
 {"schemaVersion":"1.0","type":"frame","timestamp":"1700000000.000000","interface":"vcan0","id":256,"idHex":"100","extended":false,"fd":false,"brs":false,"esi":false,"remote":false,"error":false,"len":8,"data":"3412142000000000","message":"Engine","signals":[{"name":"Speed","raw":"4660","physical":582.5,"unit":"rpm"}]}

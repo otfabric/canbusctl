@@ -10,7 +10,27 @@
   },
   "allOf": [
     {
-      "if": {"properties": {"type": {"const": "frame"}}},
+      "if": {"required": ["kind"], "properties": {"type": {"const": "frame"}, "kind": {"const": "xl"}}},
+      "then": {
+        "required": ["priority", "priorityHex", "vcid", "sdt", "af", "len", "data"],
+        "properties": {
+          "timestamp": {"type": "string", "pattern": "^[0-9]+\\.[0-9]{6}$"},
+          "interface": {"type": "string"},
+          "priority": {"type": "integer", "minimum": 0, "maximum": 2047},
+          "priorityHex": {"type": "string", "pattern": "^[0-9A-F]{3}$"},
+          "vcid": {"type": "integer", "minimum": 0, "maximum": 255},
+          "sec": {"type": "boolean"},
+          "rrs": {"type": "boolean"},
+          "sdt": {"type": "integer", "minimum": 0, "maximum": 255},
+          "af": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+          "len": {"type": "integer", "minimum": 1, "maximum": 2048},
+          "data": {"type": "string", "pattern": "^([0-9a-f]{2})+$"},
+          "echo": {"type": "boolean"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"type": {"const": "frame"}}, "not": {"required": ["kind"], "properties": {"kind": {"const": "xl"}}}},
       "then": {
         "required": ["id", "idHex", "extended", "fd", "brs", "esi", "remote", "error", "len", "data"],
         "properties": {

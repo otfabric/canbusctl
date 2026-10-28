@@ -3,6 +3,13 @@
 All notable changes are listed here; release notes are in
 [RELEASE.md](RELEASE.md).
 
+## v0.5.0 (2026-10-28)
+
+CAN XL: `xl send` (frames in can-utils notation, `--yes` off vcan) and `xl
+monitor` (CAN, CAN FD and CAN XL frames; `--output` to candump logs or JSON
+Lines) on a SocketCAN interface with the CAN XL MTU (Linux ≥ 6.2). Built on
+go-canbus v0.5.0; interop against canbus-interop v0.5.0.
+
 ## v0.4.0 (2026-10-28)
 
 `monitor --errors` and `record --errors` now show and record error frames

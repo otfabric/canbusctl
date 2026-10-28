@@ -7,7 +7,7 @@ GOWORK=off go build -o bin/canbusctl .
 cmds="interfaces info configure up down monitor send send-fd record replay stats
 dbc dbc_inspect dbc_validate dbc_decode dbc_encode dbc_generate dbc_convert
 isotp isotp_send isotp_receive isotp_monitor trace trace_convert trace_info
-simulate inject bridge version completion"
+simulate inject bridge xl xl_send xl_monitor version completion"
 {
 	echo "# canbusctl command reference"
 	echo

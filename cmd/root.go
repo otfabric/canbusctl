@@ -59,12 +59,13 @@ func formatOf(args []string) output.Format {
 func newRoot(a *app) *cobra.Command {
 	root := &cobra.Command{
 		Use:   "canbusctl",
-		Short: "Capture, decode, diagnose, transmit, replay and simulate CAN and CAN FD traffic",
-		Long: `canbusctl is a command-line toolkit for CAN, CAN FD, ISO-TP and DBC/KCD databases,
-built on github.com/otfabric/go-canbus.
+		Short: "Capture, decode, diagnose, transmit, replay and simulate CAN, CAN FD and CAN XL traffic",
+		Long: `canbusctl is a command-line toolkit for CAN, CAN FD, CAN XL, ISO-TP and DBC/KCD
+databases, built on github.com/otfabric/go-canbus.
 
-Passive by default: monitor, record, stats and the dbc commands never transmit.
-Commands that transmit (send, send-fd, replay, isotp send, simulate, inject)
+Passive by default: monitor, record, stats, xl monitor and the dbc commands
+never transmit. Commands that transmit (send, send-fd, xl send, replay, isotp
+send, simulate, inject)
 need --yes on any interface that is not virtual (vcan, vxcan or the in-process
 bus "virtual"), and are bounded by --rate, --max-frames and --duration.
 
@@ -75,6 +76,9 @@ Serial-line CAN adapters (CANable, CANtact, USBtin, LAWICEL) work on every
 OS as --interface slcan:<device> (slcan:/dev/ttyACM0, slcan:COM3) or
 slcan:tcp://host:port behind a serial server, opened at --slcan-bitrate;
 passive commands open them listen-only.
+
+CAN XL frames (xl send, xl monitor) need a SocketCAN interface with the CAN
+XL MTU (ip link set vcanxl0 mtu 2060; Linux 6.2 or later).
 
 Results go to stdout as text (default), a table or JSON (--format); progress
 and diagnostics go to stderr. Exit codes: docs/exitcodes.md.`,
@@ -111,7 +115,7 @@ and diagnostics go to stderr. Exit codes: docs/exitcodes.md.`,
 		newInterfacesCmd(a), newInfoCmd(a), newConfigureCmd(a), newUpDownCmd(a, true), newUpDownCmd(a, false),
 		newMonitorCmd(a), newSendCmd(a, false), newSendCmd(a, true), newRecordCmd(a), newReplayCmd(a), newStatsCmd(a),
 		newDBCCmd(a), newISOTPCmd(a), newSimulateCmd(a), newInjectCmd(a), newTraceCmd(a), newBridgeCmd(a),
-		newVersionCmd(a), newCompletionCmd(),
+		newXLCmd(a), newVersionCmd(a), newCompletionCmd(),
 	)
 	return root
 }
