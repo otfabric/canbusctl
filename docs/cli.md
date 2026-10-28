@@ -22,9 +22,10 @@ Usage:
   canbusctl [command]
 
 Available Commands:
+  bridge      Forward frames between two interfaces through seeded faults (needs --yes on a non-virtual interface)
   completion  Generate a shell completion script
   configure   Set bit rates, CAN FD and controller modes (Linux, CAP_NET_ADMIN, needs --yes)
-  dbc         Inspect, validate, decode, encode, generate and convert CAN databases (DBC, KCD)
+  dbc         Inspect, validate, decode, encode, generate and convert CAN databases (DBC, KCD, ARXML)
   down        Bring an interface down (Linux, CAP_NET_ADMIN, needs --yes)
   help        Help about any command
   info        Show an interface's configuration, controller state and counters (Linux)
@@ -32,12 +33,13 @@ Available Commands:
   interfaces  List the CAN interfaces of this host (Linux)
   isotp       Send, receive and monitor ISO-TP (ISO 15765-2) messages
   monitor     Print the frames of an interface as they arrive (passive)
-  record      Record frames to a candump log, JSON Lines or pcap file (passive)
+  record      Record frames to a candump log, JSON Lines, pcap, ASC or BLF file (passive)
   replay      Transmit a recorded trace (needs --yes on a non-virtual interface)
   send        Transmit classical CAN frames (needs --yes on a non-virtual interface)
   send-fd     Transmit CAN FD frames (needs --yes on a non-virtual interface)
   simulate    Generate deterministic traffic of a database's messages at their cycle times
   stats       Show interface counters and, with --duration, count live traffic per identifier (passive)
+  trace       Convert and inspect trace files (candump, JSON Lines, pcap/pcapng, ASC, BLF)
   up          Bring an interface up (Linux, CAP_NET_ADMIN, needs --yes)
   version     Print the version of canbusctl and go-canbus
 
@@ -147,7 +149,8 @@ Global Flags:
 ```text
 monitor receives frames and prints them, one line or JSON record each, until
 --count frames, --duration or Ctrl-C. It never transmits. --dbc decodes frames of
-known messages with a DBC or KCD database. Filters use candump notation:
+known messages with a DBC, KCD or ARXML database. --output also writes the
+frames to a trace file (format by extension, as record). Filters use candump notation:
 <id>:<mask> or <id>~<mask> (inverted), hexadecimal, with ",std", ",ext", ",rtr"
 or ",data"; several filters are ORed, or ANDed with --join.
 
@@ -156,7 +159,7 @@ Usage:
 
 Flags:
   -n, --count int            Stop after this many frames (0: no limit)
-      --dbc string           Decode with this DBC or KCD database
+      --dbc string           Decode with this DBC, KCD or ARXML database
       --duration duration    Stop after this time (0: until Ctrl-C)
       --errors               Also receive error frames
       --filter stringArray   Filter <id>:<mask> (repeatable)
@@ -164,6 +167,7 @@ Flags:
   -i, --interface string     CAN interface, or "virtual" (required)
       --join                 A frame must pass all filters (CAN_RAW_JOIN_FILTERS)
       --no-fd                Do not open the socket for CAN FD even when the interface carries it
+  -o, --output string        Also write the frames to this trace file
 
 Global Flags:
       --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
@@ -237,7 +241,8 @@ Global Flags:
 
 ```text
 record writes received frames to --output, in the format of its extension
-(.log/.txt candump, .jsonl lossless JSON Lines, .pcap Wireshark) or --file-format,
+(.log/.txt candump, .jsonl lossless JSON Lines, .pcap Wireshark, .asc and
+.blf Vector; ASC/BLF times are local wall-clock times: set TZ) or --file-format,
 until --count, --duration or Ctrl-C. candump logs keep microseconds; JSON Lines
 keeps every field, including nanosecond timestamps.
 
@@ -248,7 +253,7 @@ Flags:
   -n, --count int            Stop after this many frames
       --duration duration    Stop after this time
       --errors               Also record error frames
-      --file-format string   candump, jsonl or pcap (default: from the extension)
+      --file-format string   candump, jsonl, pcap, asc or blf (default: from the extension)
       --filter stringArray   Filter <id>:<mask> (repeatable)
   -h, --help                 help for record
   -i, --interface string     CAN interface, or "virtual" (required)
@@ -262,7 +267,7 @@ Global Flags:
 ## canbusctl replay
 
 ```text
-replay sends the frames of a candump log, JSON Lines or pcap/pcapng file ("-":
+replay sends the frames of a candump log, JSON Lines, pcap/pcapng, ASC or BLF file ("-":
 stdin) with their recorded timing (--speed 1), scaled (--speed 2 is twice as fast)
 or as fast as allowed (--max-speed). Error frames are never sent. --max-frames,
 --duration and --rate bound the transmission. The trace is streamed, not loaded.
@@ -306,15 +311,16 @@ Global Flags:
 ## canbusctl dbc
 
 ```text
-The dbc commands take DBC files and KCD (Kayak) files, recognised by the .kcd
-extension or XML content. DBC is a database format describing messages and
+The dbc commands take DBC files, KCD (Kayak) files and AUTOSAR 4.x ARXML
+system descriptions (their CAN part), recognised by the .kcd and .arxml
+extensions or by content. DBC is a database format describing messages and
 signals, not a protocol. None of these commands touches a CAN interface.
 
 Usage:
   canbusctl dbc [command]
 
 Available Commands:
-  convert     Convert a database: DBC or KCD to DBC, or to the JSON model
+  convert     Convert a database: DBC, KCD or ARXML to DBC, KCD or the JSON model
   decode      Decode frames given as arguments, in a trace file (--trace) or on stdin
   encode      Encode a message from signal values into a frame (cansend notation)
   generate    Generate typed Go code (or a JSON descriptor) from a database
@@ -366,10 +372,11 @@ Global Flags:
 
 ```text
 decode prints the signals of each frame of a known message. Frames come as
-cansend notation arguments, from a candump/JSON Lines/pcap trace (--trace, "-"
-for stdin), or, without either, as lines of cansend notation or candump log on
-stdin. A frame that does not decode (too short, bad multiplexer) makes the exit
-code 1; frames of unknown messages do too with --strict.
+cansend notation arguments, from a trace file (--trace: candump, JSON Lines,
+pcap/pcapng, ASC or BLF; "-" for stdin), or, without either, as lines of
+cansend notation or candump log on stdin. A frame that does not decode (too
+short, bad multiplexer) makes the exit code 1; frames of unknown messages do
+too with --strict.
 
 Usage:
   canbusctl dbc decode <database> [frame...] [flags]
@@ -429,8 +436,10 @@ Global Flags:
 ## canbusctl dbc convert
 
 ```text
-Supported conversions: dbc→dbc (normalised), kcd→dbc, dbc→json and kcd→json
-(the format-independent model). Writing KCD or ARXML is not supported.
+Reads DBC, KCD or AUTOSAR 4.x ARXML (the CAN subset) and writes DBC, KCD
+or the JSON model (--to dbc|kcd|json). Writing ARXML is not supported.
+KCD cannot carry extended multiplexing (an error), attributes, value tables
+and initial values (dropped, reported as warnings on stderr).
 
 Usage:
   canbusctl dbc convert <database> [flags]
@@ -438,7 +447,7 @@ Usage:
 Flags:
   -h, --help            help for convert
   -o, --output string   Output file (default: stdout)
-      --to string       Target format: dbc or json (required)
+      --to string       Target format: dbc, kcd or json (required)
 
 Global Flags:
       --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
@@ -451,6 +460,11 @@ ISO-TP carries messages of up to 4095 bytes (more with CAN FD escape) over CAN.
 The userspace implementation of go-canbus is used by default; --kernel uses the
 Linux kernel's CAN_ISOTP sockets. UDS and other services on top of ISO-TP are not
 interpreted.
+
+Against the kernel's ISO-TP on vcan, a userspace receiver can answer a block
+faster than the kernel sender sees the echo of its own last frame; the kernel
+then drops the flow control and the transfer times out. Give the userspace
+receiver --fc-delay 200us (N_Br) in that setup; real buses are slow enough.
 
 Usage:
   canbusctl isotp [command]
@@ -484,6 +498,7 @@ Flags:
   -n, --count int           Messages to send (default 1)
       --data string         Payload in hexadecimal
       --extended-ids        29-bit identifiers
+      --fc-delay duration   Wait this long before each flow control this receiver sends (N_Br, 0..1s; e.g. 200µs against the kernel's ISO-TP on vcan)
       --fd                  CAN FD frames
   -h, --help                help for send
   -i, --interface string    CAN interface, or "virtual" (required)
@@ -519,6 +534,7 @@ Flags:
       --bs uint8            Block size this receiver grants (0: all)
   -n, --count int           Messages to receive (0: until the timeout or Ctrl-C) (default 1)
       --extended-ids        29-bit identifiers
+      --fc-delay duration   Wait this long before each flow control this receiver sends (N_Br, 0..1s; e.g. 200µs against the kernel's ISO-TP on vcan)
       --fd                  CAN FD frames
   -h, --help                help for receive
   -i, --interface string    CAN interface, or "virtual" (required)
@@ -554,6 +570,7 @@ Flags:
       --bs uint8            Block size this receiver grants (0: all)
       --duration duration   Stop after this time
       --extended-ids        29-bit identifiers
+      --fc-delay duration   Wait this long before each flow control this receiver sends (N_Br, 0..1s; e.g. 200µs against the kernel's ISO-TP on vcan)
       --fd                  CAN FD frames
   -h, --help                help for monitor
   -i, --interface string    CAN interface, or "virtual" (required)
@@ -571,10 +588,79 @@ Global Flags:
       --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
 ```
 
+## canbusctl trace
+
+```text
+The trace commands work on files only and never touch an interface.
+
+Readable: candump logs (.log/.txt), JSON Lines (.jsonl), pcap and pcapng,
+Vector ASC (.asc) and BLF (.blf), detected from the content. Writable: all
+of them but pcapng, chosen by the output's extension or --file-format.
+
+ASC and BLF hold local wall-clock times without a time zone: they are read
+and written in the local zone; set TZ (e.g. TZ=UTC) to match a file from
+another zone.
+
+Usage:
+  canbusctl trace [command]
+
+Available Commands:
+  convert     Convert a trace to another format, optionally filtered
+  info        Summarize a trace: frames, duration, kinds, per-identifier counts and rates
+
+Flags:
+  -h, --help   help for trace
+
+Global Flags:
+      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+
+Use "canbusctl trace [command] --help" for more information about a command.
+```
+
+## canbusctl trace convert
+
+```text
+convert reads <input> ("-": stdin) in any readable format and writes
+<output> in the format of its extension (or --file-format). --filter keeps
+only matching frames (candump notation, repeatable, ORed or ANDed with
+--join); --no-errors drops error frames; --max-frames stops early. What the
+target format cannot keep (error class in ASC/BLF, interface names, echo
+marks, sub-microsecond times) is reported, never silently dropped.
+
+Usage:
+  canbusctl trace convert <input> <output> [flags]
+
+Flags:
+      --file-format string   candump, jsonl, pcap, asc or blf (default: from the extension)
+      --filter stringArray   Keep frames matching <id>:<mask> (repeatable)
+  -h, --help                 help for convert
+      --join                 A frame must pass all filters
+      --max-frames int       Stop after writing this many frames (0: all)
+      --no-errors            Drop error frames
+
+Global Flags:
+      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+```
+
+## canbusctl trace info
+
+```text
+Summarize a trace: frames, duration, kinds, per-identifier counts and rates
+
+Usage:
+  canbusctl trace info <file> [flags]
+
+Flags:
+  -h, --help   help for info
+
+Global Flags:
+      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+```
+
 ## canbusctl simulate
 
 ```text
-simulate sends the messages of a DBC or KCD database at their cycle times
+simulate sends the messages of a DBC, KCD or ARXML database at their cycle times
 (GenMsgCycleTime / interval; --default-cycle for the others) with signal values
 from --pattern: counter (the step number), random (seeded by --seed) or initial.
 The same seed and database give the same frames. With --interface virtual the
@@ -586,7 +672,7 @@ Usage:
   canbusctl simulate [flags]
 
 Flags:
-      --dbc string               DBC or KCD database (required)
+      --dbc string               DBC, KCD or ARXML database (required)
       --default-cycle duration   Period of messages without a cycle time (0: skip them)
       --duration duration        Stop transmitting after this time (0: no limit) (default 10s)
   -h, --help                     help for simulate
@@ -607,8 +693,9 @@ Global Flags:
 
 ```text
 inject takes frames (--frame in cansend notation, or a --trace file) through
-a seeded fault stage — --drop, --duplicate, --delay-probability with --delay,
---corrupt (one payload bit flipped) — and delivers what survives:
+a seeded fault stage (the chaos bridge of go-canbus, as in "bridge") —
+--drop, --duplicate, --delay-probability with --delay, --reorder, --corrupt
+(one payload bit flipped) — and delivers what survives:
 
   --interface virtual  the frames are printed as a receiver on the in-process
                        virtual bus sees them; --error-frame (bus-off, passive,
@@ -630,9 +717,9 @@ Usage:
 Flags:
       --corrupt float             Probability one payload bit is flipped
       --delay duration            Hold time of delayed frames (default 10ms)
-      --delay-probability float   Probability a frame is held for --delay
+      --delay-probability float   Probability a frame is held for --delay (later frames wait behind it)
       --drop float                Probability a frame is lost
-      --duplicate float           Probability a frame is delivered twice
+      --duplicate float           Probability a frame is forwarded twice
       --duration duration         Stop transmitting after this time (0: no limit)
       --error-frame string        Inject an error frame (virtual bus only)
       --frame stringArray         A frame in cansend notation (repeatable)
@@ -641,8 +728,52 @@ Flags:
       --malformed int             Inject this many malformed frames (virtual bus only)
       --max-frames int            Transmit at most this many frames (default 10000)
       --rate float                Transmit at most this many frames per second (0: no limit)
+      --reorder float             Probability a frame is sent after the next one
       --seed int                  Seed of the fault generator (default 1)
       --trace string              Frames from a trace file
+      --yes                       Confirm transmission on a non-virtual interface
+
+Global Flags:
+      --format string   Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+```
+
+## canbusctl bridge
+
+```text
+bridge forwards every frame received on -a to -b and, unless --one-way, from
+-b to -a, through a seeded fault stage: --drop, --duplicate,
+--delay-probability with --delay, --reorder, --corrupt. --filter limits the
+faults to matching frames (others pass untouched). Peers connected to only
+one side see each other through the bridge: put it between vcan0 and vcan1
+to test a stack, or a device on a bench bus, under faults.
+
+Interfaces: vcan/vxcan, "virtual" (the in-process bus), or others with --yes
+(the bridge transmits). Error frames and a socket's own transmissions are not
+forwarded. Runs for --duration (required) or until Ctrl-C, then prints the
+counters per direction.
+
+The faults are userspace emulation of what a receiver sees. Corrupted frames
+are delivered, where a real bus would reject them by CRC; a single bus never
+reorders a sender's frames. The same --seed gives the same decisions for the
+same traffic.
+
+Usage:
+  canbusctl bridge [flags]
+
+Flags:
+      --corrupt float             Probability one payload bit is flipped
+      --delay duration            Hold time of delayed frames (default 10ms)
+      --delay-probability float   Probability a frame is held for --delay (later frames wait behind it)
+      --drop float                Probability a frame is lost
+      --duplicate float           Probability a frame is forwarded twice
+      --duration duration         Run for this long (required)
+      --filter stringArray        Apply faults only to frames matching <id>:<mask> (repeatable)
+  -h, --help                      help for bridge
+      --one-way                   Forward from -a to -b only
+      --reorder float             Probability a frame is sent after the next one
+      --seed int                  Seed of the fault generator (default 1)
+  -a, --side-a string             First interface (required)
+  -b, --side-b string             Second interface (required)
       --yes                       Confirm transmission on a non-virtual interface
 
 Global Flags:

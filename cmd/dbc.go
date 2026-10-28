@@ -255,10 +255,11 @@ func newDBCDecodeCmd(a *app) *cobra.Command {
 		Use:   "decode <database> [frame...]",
 		Short: "Decode frames given as arguments, in a trace file (--trace) or on stdin",
 		Long: `decode prints the signals of each frame of a known message. Frames come as
-cansend notation arguments, from a candump/JSON Lines/pcap/ASC/BLF trace (--trace, "-"
-for stdin), or, without either, as lines of cansend notation or candump log on
-stdin. A frame that does not decode (too short, bad multiplexer) makes the exit
-code 1; frames of unknown messages do too with --strict.`,
+cansend notation arguments, from a trace file (--trace: candump, JSON Lines,
+pcap/pcapng, ASC or BLF; "-" for stdin), or, without either, as lines of
+cansend notation or candump log on stdin. A frame that does not decode (too
+short, bad multiplexer) makes the exit code 1; frames of unknown messages do
+too with --strict.`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			db, _, _, err := cli.LoadDatabase(args[0])
