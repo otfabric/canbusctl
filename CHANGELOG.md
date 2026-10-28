@@ -3,6 +3,12 @@
 All notable changes are listed here; release notes are in
 [RELEASE.md](RELEASE.md).
 
+## v0.2.2 (2026-10-28)
+
+Built on go-canbus v0.2.2: `monitor`, `record`, `stats` and the ISO-TP
+commands no longer lose frames that arrive between opening the interface
+and subscribing to it.
+
 ## v0.2.1 (2026-10-28)
 
 Built on go-canbus v0.2.1, which reports a socket deadline that fires a

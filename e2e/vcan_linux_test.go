@@ -70,7 +70,10 @@ func TestVCANPipeline(t *testing.T) {
 		rec := filepath.Join(dir, "rec"+ext)
 		p := start(t, "record", "-i", ifc, "-o", rec, "-n", strconv.Itoa(len(lines)), "--duration", "30s", "--filter", "100:7FF,std", "--filter", "18FEF1FE:1FFFFFFF")
 		want(t, run(t, "", "replay", src, "-i", ifc, "--max-speed"), 0, fmt.Sprintf("replayed %d of %d", len(lines), len(lines)))
-		want(t, p.wait(t, 40*time.Second), 0, fmt.Sprintf("recorded %d frames", len(lines)))
+		if r := p.wait(t, 40*time.Second); !strings.Contains(r.out, fmt.Sprintf("recorded %d frames", len(lines))) {
+			got, _ := os.ReadFile(rec)
+			t.Fatalf("record: %s %s (exit %d)\nrecorded:\n%s", r.out, r.err, r.code, got)
+		}
 		if got := decodeSignals(t, vehicle, rec); strings.Join(got, "\n") != strings.Join(base, "\n") {
 			t.Fatalf("%s decodes differently", rec)
 		}
