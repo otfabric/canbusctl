@@ -145,7 +145,7 @@ same traffic.`,
 			var first error
 			run := func(br *chaos.Bridge, src, dst canbus.Transport) {
 				defer wg.Done()
-				if err := br.Run(ctx, src, dst); err != nil && !ended(ctx, err) && ctx.Err() == nil {
+				if err := br.Run(ctx, src, dst); err != nil { // Run returns nil when ctx ends
 					mu.Lock()
 					if first == nil {
 						first = err
