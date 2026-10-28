@@ -37,8 +37,11 @@ PDUs. Built on go-canbus v0.4.0.
 
 ## Verification
 
-- INTEROP_SUMMARY
-- Coverage COVERAGE_SUMMARY.
+- Interop against canbus-interop v0.4.0 (amd64 and arm64): 86 passed,
+  0 failed, 0 skipped, 76 known-difference records. The rise from 27 known
+  is the new multiplexed ARXML fixture: cantools rejects selector values
+  no alternative describes, canmatrix 1.3.3 reads only the selector.
+- Coverage 94.4 % (Linux with vcan, the CI gate is 90 %).
 
 ---
 
