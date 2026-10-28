@@ -230,8 +230,33 @@ func start(t *testing.T, args ...string) *proc {
 			<-p.done
 		}
 	})
-	time.Sleep(300 * time.Millisecond) // bound by then
+	waitSocket(t, p)
 	return p
+}
+
+// waitSocket waits until the process has opened its CAN socket (a fixed
+// sleep is not enough in a slow microVM), then a little longer for the
+// bind and filters.
+func waitSocket(t *testing.T, p *proc) {
+	t.Helper()
+	dir := fmt.Sprintf("/proc/%d/fd", p.cmd.Process.Pid)
+	deadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(deadline) {
+		select {
+		case <-p.done:
+			return // exited early: wait reports it
+		default:
+		}
+		ents, _ := os.ReadDir(dir)
+		for _, e := range ents {
+			if l, err := os.Readlink(filepath.Join(dir, e.Name())); err == nil && strings.HasPrefix(l, "socket:") {
+				time.Sleep(150 * time.Millisecond)
+				return
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("the process opened no socket within 15 s")
 }
 
 func (p *proc) wait(t *testing.T, d time.Duration) result {

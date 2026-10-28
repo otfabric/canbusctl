@@ -28,14 +28,14 @@ import (
 // Images of canbus-interop InteropRelease, pinned by multi-arch index
 // digest (the same as go-canbus's interop tests). Override one with
 // CANBUS_INTEROP_<ADAPTER>_IMAGE (upper case).
-const InteropRelease = "v0.1.0"
+const InteropRelease = "v0.2.0"
 
 var defaultImages = map[string]string{
-	"canutils":       "ghcr.io/otfabric/canbus-interop-canutils@sha256:c4d541a178b7bedec714136c3b01897a722a06cefad4c39d6fde3afbe8b7f6de",
-	"pythoncan":      "ghcr.io/otfabric/canbus-interop-pythoncan@sha256:11178bac2eb2432acb1f9620dcb4f6945ceaacaf8472056783b776cf6efd99f9",
-	"pythoncanisotp": "ghcr.io/otfabric/canbus-interop-pythoncanisotp@sha256:130e54cab8e665dd917ce577ffced6d9870d6769e2f80d8beeb87ae9ff2c2492",
-	"cantools":       "ghcr.io/otfabric/canbus-interop-cantools@sha256:67265f75d15d9155e877e50e92e51c530d88dce63600df24ad993e2717fa9c93",
-	"canmatrix":      "ghcr.io/otfabric/canbus-interop-canmatrix@sha256:42f14775360e86ff710496be5c1eae2397ae089ec02d2c4a6082c8dba0798878",
+	"canutils":       "ghcr.io/otfabric/canbus-interop-canutils@sha256:f50df2dedd63575a1b91b58b379bfe2cc266ff0a9ca1058f7b497a742ed7b7cb",
+	"pythoncan":      "ghcr.io/otfabric/canbus-interop-pythoncan@sha256:f29e20aa79d889166e6f35277907ee33b3c01b32b6f726a86c0648319f8ec204",
+	"pythoncanisotp": "ghcr.io/otfabric/canbus-interop-pythoncanisotp@sha256:e71401d61e289d0f3ab2248791d19d439498a42188facf93ca997543891251b2",
+	"cantools":       "ghcr.io/otfabric/canbus-interop-cantools@sha256:56baa64227ad282296bd62e25a01298f0d492a71fb218388a1a4a9e7bd47f0ee",
+	"canmatrix":      "ghcr.io/otfabric/canbus-interop-canmatrix@sha256:8024a5c03911116bd27492ae8c237a9f79855105e46518180eb983813dfb7a33",
 }
 
 var (

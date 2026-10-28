@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -23,6 +24,9 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	bin = filepath.Join(dir, "canbusctl")
+	if runtime.GOOS == "windows" {
+		bin += ".exe"
+	}
 	if v := os.Getenv("CANBUSCTL_BIN"); v != "" {
 		bin = v // a prebuilt binary (the microVM has no writable Go cache)
 	} else if out, err := exec.Command("go", "build", "-race", "-o", bin, "..").CombinedOutput(); err != nil {

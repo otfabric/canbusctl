@@ -65,10 +65,10 @@ GitHub's hosted runners lack (the kernel ISO-TP test skips there and runs in
 local Linux VMs).
 
 **Results at the time of v0.2.0** (Linux arm64 VM, kernel 7.0, vcan0, vcan1
-and can-isotp): all tests pass with `-race`; whole-module coverage 94.3 %.
-Interop with canbus-interop v0.1.0 images: 54 pass, 19 known differences, 9
-skips (contract 1.1 capabilities: ARXML, log-convert); with images built from
-canbus-interop v0.2.0: 63 pass, 27 known differences, no skips.
+and can-isotp): all tests pass with `-race`; whole-module coverage 94.2 %.
+Interop with the pinned canbus-interop v0.2.0 images (contract 1.1): 63 pass,
+27 known differences, no skips (with the v0.1.0 images, which lack ARXML and
+log-convert: 54 pass, 19 known differences, 9 skips).
 
 At v0.1.0: whole-module coverage 94.5 % (macOS, without the vcan tests:
 94.4 %).

@@ -45,7 +45,8 @@ fault bridge and tested interoperability.
   wrong data, every process returns by its deadline); interop tests against
   canbus-interop (can-utils/kernel, python-can, python-can-isotp, cantools,
   canmatrix); vcan tests on vcan0 and vcan1 in CI with kernel ISO-TP;
-  microVM runs on kernels 6.1–6.18. Coverage 94.3 %.
+  microVM runs on kernels 6.1–6.18. Coverage 94.2 %; interop with
+  canbus-interop v0.2.0: 63 pass, 27 known differences, no skips.
 
 ---
 
