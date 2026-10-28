@@ -31,9 +31,15 @@ func bounded(ctx context.Context, d time.Duration) (context.Context, context.Can
 }
 
 // ended reports a receive error that ends a stream normally: the
-// duration elapsed or the user interrupted.
+// duration elapsed or the user interrupted. A socket's own deadline
+// (set from ctx) can fire a moment before ctx reports it.
 func ended(ctx context.Context, err error) bool {
-	return ctx.Err() != nil && (errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled))
+	if ctx.Err() != nil && (errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)) {
+		return true
+	}
+	dl, ok := ctx.Deadline()
+	return ok && !time.Now().Before(dl) &&
+		(errors.Is(err, context.DeadlineExceeded) || errors.Is(err, os.ErrDeadlineExceeded) || errors.Is(err, canbus.ErrTimeout))
 }
 
 type frameRecord struct {
