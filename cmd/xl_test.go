@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -10,14 +11,15 @@ import (
 )
 
 func TestXLRefusals(t *testing.T) {
-	want(t, run(t, "", "xl", "send", "-i", "virtual", "--yes", "00242#80:00:00000000#11"), 8, "SocketCAN interface")
 	want(t, run(t, "", "xl", "monitor", "-i", "slcan:/dev/null", "-n", "1"), 8, "SocketCAN interface")
+	want(t, run(t, "", "record", "--xl", "-i", "slcan:/dev/null", "-o", filepath.Join(t.TempDir(), "x.log")), 8, "slcan adapters do not carry CAN XL")
+	want(t, run(t, "", "record", "--xl", "-i", "virtual", "-o", "x.asc"), 3, "cannot hold CAN XL")
 	want(t, run(t, "", "xl", "send", "-i", "vcanxl0", "--yes", "123#11"), 3, "CAN XL header")
 	want(t, run(t, "", "xl", "send", "-i", "vcanxl0", "--yes", "00800#80:00:00000000#11"), 3, "priority")
 	want(t, run(t, "", "xl", "send", "-i", "vcanxl0", "--yes", "--repeat", "0", "00242#80:00:00000000#11"), 3, "--repeat")
 	want(t, run(t, "", "xl", "send", "-i", "vcanxl0", "--yes", "--max-frames", "1", "--repeat", "2", "00242#80:00:00000000#11"), 3, "--max-frames")
 	want(t, run(t, "", "xl", "send", "-i", "vcanxl0"), 2)
-	want(t, run(t, "", "xl", "monitor", "-i", "vcanxl0", "-o", "x.pcap"), 3, "candump logs")
+	want(t, run(t, "", "xl", "monitor", "-i", "vcanxl0", "-o", "x.blf"), 3, "cannot hold CAN XL")
 	want(t, run(t, "", "xl", "monitor", "-i", "vcanxl0", "-o", "/nonexistent/x.log"), 3, "cannot create")
 	if !linux() {
 		want(t, run(t, "", "xl", "monitor", "-i", "vcanxl0", "-n", "1"), 8, "SocketCAN is not available")

@@ -116,3 +116,25 @@ func TestVCANXL(t *testing.T) {
 		want(t, run(t, "", "xl", "monitor", "-i", "vcan0", "-n", "1"), 8, "CAN XL")
 	}
 }
+
+// TestVCANXLRecordReplay: record --xl captures CAN XL and CAN frames from
+// vcanxl0 to pcapng; replay --xl sends that file back, received by xl
+// monitor in the same order.
+func TestVCANXLRecordReplay(t *testing.T) {
+	ifc := xlIface(t)
+	frames := []string{"00242#80:01:00000000#AABBCC", "007FF#82:FF:FFFFFFFF#" + strings.Repeat("A5", 2048)}
+	out := filepath.Join(t.TempDir(), "r.pcapng")
+	rec := runAsync(t, "record", "--xl", "-i", ifc, "-n", "3", "--duration", "10s", "-o", out)
+	want(t, run(t, "", append([]string{"xl", "send", "-i", ifc, "--gap", "1ms"}, frames...)...), 0, "sent 2")
+	want(t, run(t, "", "send", "-i", ifc, "123#11"), 0)
+	want(t, <-rec, 0, "recorded 3 frames")
+	want(t, run(t, "", "trace", "info", out), 0, "CAN XL 2", "XL 00242", "XL 007FF")
+
+	mon := runAsync(t, "xl", "monitor", "-i", ifc, "-n", "3", "--duration", "10s")
+	want(t, run(t, "", "replay", "--xl", "-i", ifc, "--max-speed", out), 0, "replayed 3 of 3")
+	r := <-mon
+	want(t, r, 0, frames[0], frames[1][:40], "123#11")
+	if i, j := strings.Index(r.out, frames[0]), strings.Index(r.out, "123#11"); i < 0 || j < i {
+		t.Fatalf("order: %s", r.out)
+	}
+}

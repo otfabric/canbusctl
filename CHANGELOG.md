@@ -3,6 +3,16 @@
 All notable changes are listed here; release notes are in
 [RELEASE.md](RELEASE.md).
 
+## Unreleased
+
+CAN XL beyond `xl send`/`xl monitor`: `record --xl` and `replay --xl`
+(SocketCAN with the CAN XL MTU, or the virtual bus); `trace convert` keeps
+CAN XL frames in candump, JSON Lines, pcap and pcapng and reports them as
+lost for ASC/BLF/TRC (it dropped them silently before); `trace info`
+counts them; the `xl` commands work on the virtual bus; `--output` of `xl
+monitor` takes .pcap and .pcapng. pcapng is now written too (interface
+names kept). Filters select CAN XL frames by priority, as the kernel does.
+
 ## v0.5.0 (2026-10-28)
 
 CAN XL: `xl send` (frames in can-utils notation, `--yes` off vcan) and `xl

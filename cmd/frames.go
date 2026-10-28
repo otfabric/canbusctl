@@ -475,21 +475,27 @@ func newRecordCmd(a *app) *cobra.Command {
 		iface, out, ff  string
 		filters         []string
 		errFrames, noFD bool
+		xl              bool
 		count           int
 		duration        time.Duration
 	)
 	c := &cobra.Command{
 		Use:   "record",
-		Short: "Record frames to a candump log, JSON Lines, pcap, ASC, BLF or TRC file (passive)",
+		Short: "Record frames to a candump log, JSON Lines, pcap, pcapng, ASC, BLF or TRC file (passive)",
 		Long: `record writes received frames to --output, in the format of its extension
-(.log/.txt candump, .jsonl lossless JSON Lines, .pcap Wireshark, .asc and
-.blf Vector, .trc PEAK; ASC/BLF/TRC times are local wall-clock times: set TZ)
-or --file-format,
+(.log/.txt candump, .jsonl lossless JSON Lines, .pcap and .pcapng Wireshark,
+.asc and .blf Vector, .trc PEAK; ASC/BLF/TRC times are local wall-clock
+times: set TZ) or --file-format,
 until --count, --duration or Ctrl-C. candump logs keep microseconds; JSON Lines
-keeps every field, including nanosecond timestamps.`,
+keeps every field, including nanosecond timestamps; pcapng keeps interface
+names. --xl also records CAN XL frames (a SocketCAN interface with the CAN XL
+MTU or the virtual bus; candump, JSON Lines, pcap and pcapng only).`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			format, err := cli.TraceFormat(out, ff)
+			if xl && err == nil {
+				format, err = xlFormat(out, ff)
+			}
 			if err != nil {
 				return err
 			}
@@ -497,12 +503,16 @@ keeps every field, including nanosecond timestamps.`,
 			if err != nil {
 				return err
 			}
-			bus, err := openBus(iface, openOpts{autoFD: !noFD, filters: &fs, passive: true})
+			bus, err := openBus(iface, openOpts{autoFD: !noFD, filters: &fs, passive: true, xl: xl})
 			if err != nil {
 				return err
 			}
 			defer func() { _ = bus.Close() }()
-			sub, err := bus.Subscribe(canbus.WithQueueSize(65536), canbus.WithFilters(fs))
+			so := []canbus.SubscribeOption{canbus.WithQueueSize(65536), canbus.WithFilters(fs)}
+			if xl {
+				so = append(so, canbus.WithXL())
+			}
+			sub, err := bus.Subscribe(so...)
 			if err != nil {
 				return err
 			}
@@ -517,7 +527,12 @@ keeps every field, including nanosecond timestamps.`,
 			}
 			ctx, cancel := bounded(cmd.Context(), duration)
 			defer cancel()
-			n, err := capture.RecordFrames(ctx, sub, w, count)
+			var n int
+			if xl {
+				n, err = capture.RecordAll(ctx, sub, w.(capture.XLWriter), count)
+			} else {
+				n, err = capture.RecordFrames(ctx, sub, w, count)
+			}
 			if cerr := w.Close(); err == nil && cerr != nil {
 				err = cerr
 			}
@@ -530,10 +545,11 @@ keeps every field, including nanosecond timestamps.`,
 	f := c.Flags()
 	f.StringVarP(&iface, "interface", "i", "", "CAN interface, or \"virtual\" (required)")
 	f.StringVarP(&out, "output", "o", "", "Output file (required)")
-	f.StringVar(&ff, "file-format", "", "candump, jsonl, pcap, asc, blf or trc (default: from the extension)")
-	f.StringArrayVar(&filters, "filter", nil, "Filter <id>:<mask> (repeatable)")
+	f.StringVar(&ff, "file-format", "", "candump, jsonl, pcap, pcapng, asc, blf or trc (default: from the extension)")
+	f.StringArrayVar(&filters, "filter", nil, "Filter <id>:<mask> (repeatable; selects CAN XL frames by priority)")
 	f.BoolVar(&errFrames, "errors", false, "Also record error frames")
 	f.BoolVar(&noFD, "no-fd", false, "Do not open the socket for CAN FD")
+	f.BoolVar(&xl, "xl", false, "Also record CAN XL frames (SocketCAN with the CAN XL MTU, or virtual)")
 	f.IntVarP(&count, "count", "n", 0, "Stop after this many frames")
 	f.DurationVar(&duration, "duration", 0, "Stop after this time")
 	_ = c.MarkFlagRequired("interface")
@@ -548,6 +564,7 @@ type replayResult struct {
 	Sent      int     `json:"sent"`
 	Filtered  int     `json:"filtered"`
 	Skipped   int     `json:"skipped"`
+	SkippedXL int     `json:"skippedXL"`
 	ElapsedS  float64 `json:"elapsedSeconds"`
 	Limited   bool    `json:"limited"`
 }
@@ -556,6 +573,9 @@ func (r replayResult) Text() string {
 	s := fmt.Sprintf("replayed %d of %d frames from %s on %s in %.3f s", r.Sent, r.Read, r.Input, r.Interface, r.ElapsedS)
 	if r.Filtered > 0 || r.Skipped > 0 {
 		s += fmt.Sprintf(" (%d filtered, %d error frames skipped)", r.Filtered, r.Skipped)
+	}
+	if r.SkippedXL > 0 {
+		s += fmt.Sprintf("; %d CAN XL frames not sent (replay with --xl on an interface with the CAN XL MTU)", r.SkippedXL)
 	}
 	if r.Limited {
 		s += "; stopped by a limit"
@@ -571,6 +591,7 @@ func newReplayCmd(a *app) *cobra.Command {
 		maxSpeed bool
 		filters  []string
 		printF   bool
+		xl       bool
 		limits   sendLimits
 	)
 	c := &cobra.Command{
@@ -579,7 +600,9 @@ func newReplayCmd(a *app) *cobra.Command {
 		Long: `replay sends the frames of a candump log, JSON Lines, pcap/pcapng, ASC or BLF file ("-":
 stdin) with their recorded timing (--speed 1), scaled (--speed 2 is twice as fast)
 or as fast as allowed (--max-speed). Error frames are never sent. --max-frames,
---duration and --rate bound the transmission. The trace is streamed, not loaded.`,
+--duration and --rate bound the transmission. The trace is streamed, not loaded.
+--xl opens the interface for CAN XL and sends the trace's CAN XL frames too;
+without it they are counted, not sent.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if speed <= 0 && !maxSpeed {
@@ -597,7 +620,7 @@ or as fast as allowed (--max-speed). Error frames are never sent. --max-frames,
 				return err
 			}
 			defer closeTrace()
-			t, err := openTransport(iface, openOpts{autoFD: true})
+			t, err := openTransport(iface, openOpts{autoFD: true, xl: xl})
 			if err != nil {
 				return err
 			}
@@ -616,13 +639,18 @@ or as fast as allowed (--max-speed). Error frames are never sent. --max-frames,
 					out.Interface, out.Timestamp = iface, time.Now()
 					_ = st.Record("frame", cli.FrameLine(&out), cli.ToJSON(&out))
 				}
+				opts.OnXLFrame = func(x *canbus.XLFrame) {
+					out := *x
+					out.Interface, out.Timestamp = iface, time.Now()
+					_ = st.Record("frame", xlLine(&out), toXLJSON(&out))
+				}
 			}
 			stats, err := capture.Replay(cmd.Context(), r, t, opts)
 			if err != nil && !ended(cmd.Context(), err) {
 				return err
 			}
 			res := replayResult{Interface: iface, Input: args[0], Read: stats.Read, Sent: stats.Sent, Filtered: stats.Filtered,
-				Skipped: stats.Skipped, ElapsedS: stats.Elapsed.Seconds(), Limited: stats.Limited}
+				Skipped: stats.Skipped, SkippedXL: stats.SkippedXL, ElapsedS: stats.Elapsed.Seconds(), Limited: stats.Limited}
 			if printF && a.format == "json" {
 				return st.Record("summary", "", res)
 			}
@@ -636,6 +664,7 @@ or as fast as allowed (--max-speed). Error frames are never sent. --max-frames,
 	f.BoolVar(&maxSpeed, "max-speed", false, "Ignore the recorded timing")
 	f.StringArrayVar(&filters, "filter", nil, "Replay only frames passing <id>:<mask> (repeatable)")
 	f.BoolVar(&printF, "print", false, "Print every frame sent")
+	f.BoolVar(&xl, "xl", false, "Send CAN XL frames too (SocketCAN with the CAN XL MTU, or virtual)")
 	addLimitFlags(c, &limits, 0)
 	_ = c.MarkFlagRequired("interface")
 	return c

@@ -82,7 +82,7 @@ func TestTraceConvertOptions(t *testing.T) {
 	in, _ := os.ReadFile("testdata/trace.log")
 	want(t, run(t, string(in), "trace", "convert", "-", filepath.Join(dir, "s.out"), "--file-format", "jsonl"), 0, "4 written")
 	// Errors.
-	want(t, run(t, "", "trace", "convert", "testdata/trace.log", "x.pcapng"), 8, "pcapng")
+	want(t, run(t, "", "trace", "convert", "testdata/trace.log", filepath.Join(dir, "x.pcapng")), 0, "4 written")
 	want(t, run(t, "", "trace", "convert", "testdata/trace.log", out, "--file-format", "mf4"), 3, "unknown trace format")
 	want(t, run(t, "", "trace", "convert", "testdata/trace.log", out, "--filter", "zz"), 3)
 	want(t, run(t, "", "trace", "convert", "testdata/missing.log", out), 3)
@@ -117,7 +117,7 @@ func TestTraceInfo(t *testing.T) {
 	in, _ := os.ReadFile("testdata/trace.log")
 	want(t, run(t, string(in), "trace", "info", "-"), 0, "4 frames")
 	fd := writeTrace(t, capture.FormatJSONL, append(vehicleFrames(t), canbus.Frame{ID: 0x321, Flags: canbus.FlagRemote, Len: 2}))
-	want(t, run(t, "", "trace", "info", fd), 0, "CAN FD 1, remote 1")
+	want(t, run(t, "", "trace", "info", fd), 0, "CAN FD 1, CAN XL 0, remote 1")
 	want(t, run(t, "", "trace", "info", "testdata/missing.log"), 3)
 	want(t, run(t, "", "trace", "info", "testdata/vehicle.dbc"), 3)
 	bad := filepath.Join(t.TempDir(), "bad.log")
@@ -138,7 +138,6 @@ func TestMonitorOutput(t *testing.T) {
 	if n := len(traceFrames(t, out)); n != 3 {
 		t.Fatal(n)
 	}
-	want(t, run(t, "", "monitor", "-i", "virtual", "-o", "x.pcapng"), 8, "pcapng")
 	want(t, run(t, "", "monitor", "-i", "virtual", "-o", filepath.Join(t.TempDir(), "no/x.log")), 3, "cannot create")
 }
 

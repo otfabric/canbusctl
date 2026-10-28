@@ -24,6 +24,7 @@ type openOpts struct {
 	filters *canbus.FilterSet
 	recvOwn bool
 	passive bool // the command never transmits: slcan adapters open listen-only
+	xl      bool // CAN XL (and so CAN FD): SocketCAN and the virtual bus only
 }
 
 // slcanFlags are the --slcan-* flags of an invocation.
@@ -92,10 +93,16 @@ func sharedVirtual() *virtual.Bus {
 // openTransport opens an interface; tests replace it.
 var openTransport = func(iface string, o openOpts) (canbus.Transport, error) {
 	if strings.HasPrefix(iface, cli.SlcanPrefix) {
+		if o.xl {
+			return nil, fmt.Errorf("%w: %s: slcan adapters do not carry CAN XL", canbus.ErrUnsupported, iface)
+		}
 		return openSlcan(iface, o)
 	}
 	if iface == cli.Virtual {
 		vo := []virtual.PortOption{virtual.WithFD(), virtual.WithQueueSize(65536)}
+		if o.xl {
+			vo = append(vo, virtual.WithXL())
+		}
 		if o.filters != nil {
 			vo = append(vo, virtual.WithFilters(*o.filters))
 		}
@@ -113,6 +120,9 @@ var openTransport = func(iface string, o openOpts) (canbus.Transport, error) {
 	}
 	if fd {
 		so = append(so, socketcan.WithFD())
+	}
+	if o.xl {
+		so = append(so, socketcan.WithXL())
 	}
 	if o.filters != nil {
 		so = append(so, socketcan.WithFilters(*o.filters))

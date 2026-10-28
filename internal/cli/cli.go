@@ -196,17 +196,15 @@ func OpenTrace(path string, stdin io.Reader) (capture.Reader, func(), error) {
 func TraceFormat(path, explicit string) (capture.Format, error) {
 	if explicit != "" {
 		switch capture.Format(explicit) {
-		case capture.FormatCandump, capture.FormatJSONL, capture.FormatPCAP, capture.FormatASC, capture.FormatBLF, capture.FormatTRC:
+		case capture.FormatCandump, capture.FormatJSONL, capture.FormatPCAP, capture.FormatPCAPNG, capture.FormatASC, capture.FormatBLF, capture.FormatTRC:
 			return capture.Format(explicit), nil
 		default:
 		}
-		return "", errs.Invalid("unknown trace format %q (candump, jsonl, pcap, asc, blf or trc)", explicit)
+		return "", errs.Invalid("unknown trace format %q (candump, jsonl, pcap, pcapng, asc, blf or trc)", explicit)
 	}
 	switch f := capture.FormatFromPath(path); f {
 	case "", capture.FormatCandump:
 		return capture.FormatCandump, nil
-	case capture.FormatPCAPNG:
-		return "", errs.New(errs.KindUnsupported, errs.CodeUnsupported, "pcapng is read, not written: use .pcap")
 	default:
 		return f, nil
 	}

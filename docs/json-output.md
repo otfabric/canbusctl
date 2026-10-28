@@ -27,8 +27,11 @@ convert/info, simulate, inject, bridge, version) write one indented document:
 ```
 
 `trace convert` reports `read`, `written`, `filtered` and `losses` (what the
-target format could not keep); `trace info` the frame kinds and per-identifier
-`ids` (`frames`, `rateHz`, `minLen`, `maxLen`); `bridge` the counters of each
+target format could not keep, CAN XL frames in ASC/BLF/TRC included);
+`trace info` the frame kinds (`classical`, `fd`, `xl`, `remote`, `errors`)
+and per-identifier `ids` (`frames`, `rateHz`, `minLen`, `maxLen`; CAN XL
+frames as `"XL <vcid><priority>"`, e.g. `"XL 05242"`); `replay` also
+`skippedXL` (CAN XL frames not sent without `--xl`); `bridge` the counters of each
 direction (`aToB`, `bToA`: `received`, `forwarded`, `dropped`, `duplicated`,
 `delayed`, `reordered`, `corrupted`). `inject`'s `faults` has the same
 counters (v0.2.0: `received`, `forwarded` and `reordered` are new).
@@ -44,7 +47,7 @@ with `schemaVersion` and `type`:
 | `frame` | the frame fields above, plus `timestamp` (seconds with microseconds, as a string), `interface`, `echo`; decoded frames add `message` and `signals` (`name`, `raw` as an exact decimal string, `physical`, `unit`, `label`) or `decodeError`; error frames add `errorInfo` |
 | `message` | ISO-TP: `len`, `data` (hex), `txId` (isotp monitor) |
 | `note` | isotp monitor: `txId`, `note` |
-| `frame` with `"kind": "xl"` | xl monitor's CAN XL frames: `priority`, `priorityHex`, `vcid`, `sec`, `rrs`, `sdt`, `af`, `len` (1..2048), `data`, `timestamp`, `interface`, `echo` (its CAN and CAN FD frames are ordinary `frame` records) |
+| `frame` with `"kind": "xl"` | CAN XL frames of xl monitor and replay `--xl --print`: `priority`, `priorityHex`, `vcid`, `sec`, `rrs`, `sdt`, `af`, `len` (1..2048), `data`, `timestamp`, `interface`, `echo` (its CAN and CAN FD frames are ordinary `frame` records) |
 | `summary` | the end of monitor (`frames`, `dropped`), xl monitor (also `xl`: the CAN XL frames), simulate, replay `--print` |
 
 ```json
