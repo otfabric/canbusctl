@@ -3,6 +3,8 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -145,7 +147,9 @@ same traffic.`,
 			var first error
 			run := func(br *chaos.Bridge, src, dst canbus.Transport) {
 				defer wg.Done()
-				if err := br.Run(ctx, src, dst); err != nil && ctx.Err() == nil {
+				// A socket's deadline can expire a moment before ctx
+				// reports it: a deadline error is the normal end.
+				if err := br.Run(ctx, src, dst); err != nil && ctx.Err() == nil && !errors.Is(err, context.DeadlineExceeded) {
 					mu.Lock()
 					if first == nil {
 						first = err

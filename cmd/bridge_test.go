@@ -16,8 +16,8 @@ func TestBridgeErrors(t *testing.T) {
 	want(t, run(t, "", "bridge", "-a", "virtual", "-b", "vcan0", "--duration", "1s", "--drop", "1.5"), 3, "between 0 and 1")
 	want(t, run(t, "", "bridge", "-a", "virtual", "-b", "vcan0", "--duration", "1s", "--filter", "zz"), 3)
 	if linux() { // elsewhere the interface kind cannot be determined (exit 8)
-		want(t, run(t, "", "bridge", "-a", "virtual", "-b", "can0", "--duration", "1s"), 9, "--yes")
-		want(t, run(t, "", "bridge", "-a", "can0", "-b", "virtual", "--duration", "1s"), 9, "--yes")
+		want(t, run(t, "", "bridge", "-a", "virtual", "-b", "lo", "--duration", "1s"), 9, "--yes")
+		want(t, run(t, "", "bridge", "-a", "lo", "-b", "virtual", "--duration", "1s"), 9, "--yes")
 	} else {
 		want(t, run(t, "", "bridge", "-a", "virtual", "-b", "vcan0", "--duration", "1s"), 8)
 		want(t, run(t, "", "bridge", "-a", "vcan0", "-b", "virtual", "--duration", "1s", "--one-way", "--filter", "100:7FF"), 8)
