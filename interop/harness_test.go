@@ -33,13 +33,15 @@ const InteropRelease = "v0.2.0"
 var defaultImages = map[string]string{
 	"canutils":       "ghcr.io/otfabric/canbus-interop-canutils@sha256:f50df2dedd63575a1b91b58b379bfe2cc266ff0a9ca1058f7b497a742ed7b7cb",
 	"pythoncan":      "ghcr.io/otfabric/canbus-interop-pythoncan@sha256:f29e20aa79d889166e6f35277907ee33b3c01b32b6f726a86c0648319f8ec204",
+	"socketcanrs":    "ghcr.io/otfabric/canbus-interop-socketcanrs@sha256:cf07b3b0ba34204c61aa95ec6cca63ef4c863f5a97bf77d141e35998ac878ff2",
+	"scapy":          "ghcr.io/otfabric/canbus-interop-scapy@sha256:2e3d8136f97a0ca764c80796673da77a501fb9783b55f8f9476f414ae10b16c0",
 	"pythoncanisotp": "ghcr.io/otfabric/canbus-interop-pythoncanisotp@sha256:e71401d61e289d0f3ab2248791d19d439498a42188facf93ca997543891251b2",
 	"cantools":       "ghcr.io/otfabric/canbus-interop-cantools@sha256:56baa64227ad282296bd62e25a01298f0d492a71fb218388a1a4a9e7bd47f0ee",
 	"canmatrix":      "ghcr.io/otfabric/canbus-interop-canmatrix@sha256:8024a5c03911116bd27492ae8c237a9f79855105e46518180eb983813dfb7a33",
 }
 
 var (
-	rawAdapters   = []string{"canutils", "pythoncan"}
+	rawAdapters   = []string{"canutils", "pythoncan", "socketcanrs", "scapy"}
 	isotpAdapters = []string{"canutils", "pythoncanisotp"}
 	dbAdapters    = []string{"cantools", "canmatrix"}
 )

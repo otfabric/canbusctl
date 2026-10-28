@@ -46,8 +46,8 @@ error), some messages get through, and with every fault (reorder and corrupt
 too) all processes return by their deadlines.
 
 **Interop tests** (`interop/`, build tag `interop`) run the binary against
-the pinned canbus-interop images: `send`/`send-fd` → can-utils and python-can
-receivers; their senders → `monitor --format json`; `isotp send`/`receive`
+the pinned canbus-interop images: `send`/`send-fd` → can-utils, python-can,
+socketcan-rs and Scapy receivers; their senders → `monitor --format json`; `isotp send`/`receive`
 ↔ the kernel (can-utils) and python-can-isotp, and `--kernel` →
 python-can-isotp; `dbc decode`/`encode` against cantools and canmatrix (DBC
 and ARXML fixtures); `dbc convert --to kcd` read back by canmatrix; `record`
@@ -63,6 +63,9 @@ and mainline 6.1, 6.6, 6.12 and 6.18 (`scripts/microvm-test.sh`).
 `CANBUS_REQUIRE_ISOTP=1` does the same for the can-isotp module, which
 GitHub's hosted runners lack (the kernel ISO-TP test skips there and runs in
 local Linux VMs).
+
+**Interop at the time of v0.2.2** (same VM, canbus-interop v0.2.0 images,
+socketcan-rs and Scapy added): 83 pass, 27 known differences, no skips.
 
 **Results at the time of v0.2.0** (Linux arm64 VM, kernel 7.0, vcan0, vcan1
 and can-isotp): all tests pass with `-race`; whole-module coverage 94.2 %.
