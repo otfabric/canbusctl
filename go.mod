@@ -3,7 +3,7 @@ module github.com/otfabric/canbusctl
 go 1.23
 
 require (
-	github.com/otfabric/go-canbus v0.2.2
+	github.com/otfabric/go-canbus v0.3.0
 	github.com/spf13/cobra v1.10.2
 )
 
@@ -12,5 +12,3 @@ require (
 	github.com/otfabric/go-serial v0.1.6 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 )
-
-replace github.com/otfabric/go-canbus => ../go-canbus

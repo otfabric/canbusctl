@@ -51,7 +51,7 @@ socketcan-rs and Scapy receivers; their senders → `monitor --format json`; `is
 ↔ the kernel (can-utils) and python-can-isotp, and `--kernel` →
 python-can-isotp; `dbc decode`/`encode` against cantools and canmatrix (DBC
 and ARXML fixtures); `dbc convert --to kcd` read back by canmatrix; `record`
-.asc/.blf/.log read by python-can (`log-convert`). A capability an image
+.asc/.blf/.trc/.log read by python-can (`log-convert`). A capability an image
 lacks is a recorded skip, never a pass; deliberate differences are recorded
 as known differences (`CANBUS_INTEROP_REPORT` writes the matrix).
 
@@ -63,6 +63,12 @@ and mainline 6.1, 6.6, 6.12 and 6.18 (`scripts/microvm-test.sh`).
 `CANBUS_REQUIRE_ISOTP=1` does the same for the can-isotp module, which
 GitHub's hosted runners lack (the kernel ISO-TP test skips there and runs in
 local Linux VMs).
+
+**At the time of v0.3.0** (same VM, canbus-interop v0.3.0 images): interop
+84 pass, 27 known differences, no skips (`record` .trc read by python-can
+added); the end-to-end test against the kernel's slcan driver
+(`TestSlcanKernel`, root, socat) passes, as in the Kernels microVMs;
+whole-module coverage 92.4 % (macOS).
 
 **Interop at the time of v0.2.2** (same VM, canbus-interop v0.2.0 images,
 socketcan-rs and Scapy added): 83 pass, 27 known differences, no skips.
