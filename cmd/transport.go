@@ -67,13 +67,14 @@ var openTransport = func(iface string, o openOpts) (canbus.Transport, error) {
 	return socketcan.Open(iface, so...)
 }
 
-// openBus opens an interface wrapped in a Bus.
+// openBus opens an interface wrapped in a Bus that reads from its first
+// subscription on: no frame between opening and subscribing is lost.
 func openBus(iface string, o openOpts) (*canbus.Bus, error) {
 	t, err := openTransport(iface, o)
 	if err != nil {
 		return nil, err
 	}
-	b, err := canbus.NewBus(t, canbus.WithInterfaceName(iface))
+	b, err := canbus.NewBus(t, canbus.WithInterfaceName(iface), canbus.WithStartOnSubscribe())
 	if err != nil {
 		_ = t.Close()
 		return nil, err

@@ -70,7 +70,10 @@ func TestVCANPipeline(t *testing.T) {
 		rec := filepath.Join(dir, "rec"+ext)
 		p := start(t, "record", "-i", ifc, "-o", rec, "-n", strconv.Itoa(len(lines)), "--duration", "30s", "--filter", "100:7FF,std", "--filter", "18FEF1FE:1FFFFFFF")
 		want(t, run(t, "", "replay", src, "-i", ifc, "--max-speed"), 0, fmt.Sprintf("replayed %d of %d", len(lines), len(lines)))
-		want(t, p.wait(t, 40*time.Second), 0, fmt.Sprintf("recorded %d frames", len(lines)))
+		if r := p.wait(t, 40*time.Second); !strings.Contains(r.out, fmt.Sprintf("recorded %d frames", len(lines))) {
+			got, _ := os.ReadFile(rec)
+			t.Fatalf("record: %s %s (exit %d)\nrecorded:\n%s", r.out, r.err, r.code, got)
+		}
 		if got := decodeSignals(t, vehicle, rec); strings.Join(got, "\n") != strings.Join(base, "\n") {
 			t.Fatalf("%s decodes differently", rec)
 		}
@@ -202,15 +205,16 @@ func pattern(n int) []byte {
 
 // proc is a canbusctl process in the background.
 type proc struct {
-	cmd  *exec.Cmd
-	o, e bytes.Buffer
-	done chan struct{}
-	code int
+	cmd   *exec.Cmd
+	o, e  bytes.Buffer
+	done  chan struct{}
+	code  int
+	lists int // receive list entries before the process started (-1: unknown)
 }
 
 func start(t *testing.T, args ...string) *proc {
 	t.Helper()
-	p := &proc{done: make(chan struct{})}
+	p := &proc{done: make(chan struct{}), lists: canRcvLists()}
 	p.cmd = exec.Command(bin, args...)
 	p.cmd.Stdout, p.cmd.Stderr = &p.o, &p.e
 	if err := p.cmd.Start(); err != nil {
@@ -235,8 +239,8 @@ func start(t *testing.T, args ...string) *proc {
 }
 
 // waitSocket waits until the process has opened its CAN socket (a fixed
-// sleep is not enough in a slow microVM), then a little longer for the
-// bind and filters.
+// sleep is not enough in a slow microVM), then until the kernel's receive
+// lists change: the socket is bound and its filters are in place.
 func waitSocket(t *testing.T, p *proc) {
 	t.Helper()
 	dir := fmt.Sprintf("/proc/%d/fd", p.cmd.Process.Pid)
@@ -250,13 +254,53 @@ func waitSocket(t *testing.T, p *proc) {
 		ents, _ := os.ReadDir(dir)
 		for _, e := range ents {
 			if l, err := os.Readlink(filepath.Join(dir, e.Name())); err == nil && strings.HasPrefix(l, "socket:") {
-				time.Sleep(150 * time.Millisecond)
+				waitBound(p)
 				return
 			}
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatal("the process opened no socket within 15 s")
+}
+
+// waitBound waits up to 5 s for the receive lists in /proc/net/can to
+// differ from those before the process started. Without them (no proc
+// support, or a socket that registers nothing) it falls back to a pause.
+func waitBound(p *proc) {
+	if p.lists < 0 {
+		time.Sleep(150 * time.Millisecond)
+		return
+	}
+	for end := time.Now().Add(5 * time.Second); time.Now().Before(end); time.Sleep(5 * time.Millisecond) {
+		select {
+		case <-p.done:
+			return
+		default:
+		}
+		if canRcvLists() != p.lists {
+			time.Sleep(20 * time.Millisecond) // a second filter may follow the first
+			return
+		}
+	}
+}
+
+// canRcvLists counts the entries of the kernel's CAN receive lists, or
+// returns -1 without them. Entries carry match counters, so their text
+// changes with traffic; their number changes only with sockets.
+func canRcvLists() int {
+	n := 0
+	for _, l := range []string{"all", "fil", "inv", "eff", "sff", "err"} {
+		d, err := os.ReadFile("/proc/net/can/rcvlist_" + l)
+		if err != nil {
+			return -1
+		}
+		for _, line := range strings.Split(string(d), "\n") {
+			if f := strings.Fields(line); len(f) >= 6 && strings.HasPrefix(line, "  ") && !strings.HasPrefix(f[0], "(") && f[0] != "device" {
+				n++
+			}
+		}
+	}
+	return n
 }
 
 func (p *proc) wait(t *testing.T, d time.Duration) result {

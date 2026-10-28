@@ -6,6 +6,23 @@ with the version bump). It computes the tag, builds the binaries for linux
 publishes the GitHub release with the section of this file that matches the
 version as its notes. Add the section before running it.
 
+## v0.2.2
+
+**Date:** 2026-10-28
+**Previous release:** v0.2.1
+
+canbusctl on go-canbus v0.2.2.
+
+- `monitor`, `record`, `stats` and the ISO-TP commands could lose the
+  first frames that arrived between opening the interface and subscribing
+  to it (go-canbus's Bus started reading at once). They now open the bus
+  with `canbus.WithStartOnSubscribe`, so frames wait in the socket until
+  the command listens. Found by the end-to-end tests in a slow microVM,
+  where `record` kept 21 of 60 frames.
+- Tests: the end-to-end harness waits until the kernel has registered a
+  started process's CAN filters (/proc/net/can) before sending to it, and
+  prints the recording when `record` misses frames.
+
 ## v0.2.1
 
 **Date:** 2026-10-28
