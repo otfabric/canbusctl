@@ -6,6 +6,45 @@ with the version bump). It computes the tag, builds the binaries for linux
 publishes the GitHub release with the section of this file that matches the
 version as its notes. Add the section before running it.
 
+## v0.5.0
+
+**Date:** 2026-10-28
+**Previous release:** v0.4.0
+
+## Summary
+
+CAN XL frames on SocketCAN. Built on go-canbus v0.5.0.
+
+## Additions
+
+- **`canbusctl xl send -i <iface> <frame>...`**: CAN XL frames in can-utils
+  notation, `<vcid><prio>#<flags>:<sdt>:<af>#<data>` (for example
+  `00242#80:03:00C0FFEE#11223344`), with `--repeat`, `--gap`, `--rate`,
+  `--max-frames` and `--duration`; like every transmitting command it needs
+  `--yes` on an interface that is not vcan or vxcan.
+- **`canbusctl xl monitor -i <iface>`**: every frame of a CAN XL interface,
+  CAN XL, CAN and CAN FD, in arrival order, as text or JSON (`"kind":"xl"`
+  records with priority, VCID, SEC, RRS, SDT, AF and data; the summary
+  counts the CAN XL frames); `--output` writes candump logs or JSON Lines,
+  the trace formats that carry CAN XL. Passive.
+- The interface needs the CAN XL MTU (`ip link set vcanxl0 mtu 2060`, Linux
+  ≥ 6.2); the virtual bus and slcan adapters have no CAN XL (exit 8).
+
+## Verification
+
+- End to end on `vcanxl0` (CI and the microVMs on kernels ≥ 6.2): one
+  process sends CAN XL frames (up to 600 bytes, VCID, SEC/RRS) and a CAN
+  frame, another monitors them and writes candump and JSON Lines traces.
+- Against can-utils v2025.01 (canbus-interop v0.5.0, contract 1.3):
+  `xl send` → candump and cansend → `xl monitor --format json` with the six
+  frames of `xl.jsonl` (1 to 2048 bytes, VCIDs 0x42 and 0xFF).
+- JSON output checked against schemas/record-v1.schema.json (which now
+  describes CAN XL frame records).
+- INTEROP_SUMMARY
+- COVERAGE_SUMMARY
+
+---
+
 ## v0.4.0
 
 **Date:** 2026-10-28

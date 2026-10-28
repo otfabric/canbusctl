@@ -4,11 +4,12 @@ Generated from `canbusctl <command> --help` by scripts/gen-cli-doc.sh; do not ed
 Exit codes: [exitcodes.md](exitcodes.md). JSON output: [json-output.md](json-output.md).
 
 ```text
-canbusctl is a command-line toolkit for CAN, CAN FD, ISO-TP and DBC/KCD databases,
-built on github.com/otfabric/go-canbus.
+canbusctl is a command-line toolkit for CAN, CAN FD, CAN XL, ISO-TP and DBC/KCD
+databases, built on github.com/otfabric/go-canbus.
 
-Passive by default: monitor, record, stats and the dbc commands never transmit.
-Commands that transmit (send, send-fd, replay, isotp send, simulate, inject)
+Passive by default: monitor, record, stats, xl monitor and the dbc commands
+never transmit. Commands that transmit (send, send-fd, xl send, replay, isotp
+send, simulate, inject)
 need --yes on any interface that is not virtual (vcan, vxcan or the in-process
 bus "virtual"), and are bounded by --rate, --max-frames and --duration.
 
@@ -19,6 +20,9 @@ Serial-line CAN adapters (CANable, CANtact, USBtin, LAWICEL) work on every
 OS as --interface slcan:<device> (slcan:/dev/ttyACM0, slcan:COM3) or
 slcan:tcp://host:port behind a serial server, opened at --slcan-bitrate;
 passive commands open them listen-only.
+
+CAN XL frames (xl send, xl monitor) need a SocketCAN interface with the CAN
+XL MTU (ip link set vcanxl0 mtu 2060; Linux 6.2 or later).
 
 Results go to stdout as text (default), a table or JSON (--format); progress
 and diagnostics go to stderr. Exit codes: docs/exitcodes.md.
@@ -47,6 +51,7 @@ Available Commands:
   trace       Convert and inspect trace files (candump, JSON Lines, pcap/pcapng, ASC, BLF, TRC)
   up          Bring an interface up (Linux, CAP_NET_ADMIN, needs --yes)
   version     Print the version of canbusctl and go-canbus
+  xl          CAN XL frames on SocketCAN (Linux ≥ 6.2, interface mtu 2060)
 
 Flags:
       --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
@@ -866,6 +871,87 @@ Flags:
   -a, --side-a string             First interface (required)
   -b, --side-b string             Second interface (required)
       --yes                       Confirm transmission on a non-virtual interface
+
+Global Flags:
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
+```
+
+## canbusctl xl
+
+```text
+CAN XL frames (ISO 11898-1:2024: 11-bit priority, VCID, SEC and RRS flags,
+SDU type, acceptance field, 1..2048 data bytes) on a SocketCAN interface with
+the CAN XL MTU (ip link set vcanxl0 mtu 2060; Linux 6.2 or later, VCIDs 6.9).
+Frames use can-utils notation: <vcid><prio>#<flags>:<sdt>:<af>#<data>, for
+example 00242#80:03:00C0FFEE#11223344, or <prio>#... with VCID 0.
+
+Usage:
+  canbusctl xl [command]
+
+Available Commands:
+  monitor     Print CAN, CAN FD and CAN XL frames as they arrive (passive)
+  send        Transmit CAN XL frames (needs --yes on a non-virtual interface)
+
+Flags:
+  -h, --help   help for xl
+
+Global Flags:
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
+
+Use "canbusctl xl [command] --help" for more information about a command.
+```
+
+## canbusctl xl send
+
+```text
+Frames in can-utils notation, as cansend takes them:
+<vcid><prio>#<flags>:<sdt>:<af>#<data> (data bytes may be separated by dots).
+--repeat sends the frames that many times, --gap waits between frames. On any
+interface that is not vcan or vxcan nothing is sent without --yes.
+
+Usage:
+  canbusctl xl send frame... [flags]
+
+Flags:
+      --duration duration   Stop transmitting after this time (0: no limit)
+      --gap duration        Pause between frames
+  -h, --help                help for send
+  -i, --interface string    SocketCAN interface with the CAN XL MTU (required)
+      --max-frames int      Transmit at most this many frames (default 10000)
+      --rate float          Transmit at most this many frames per second (0: no limit)
+      --repeat int          Send the frames this many times (default 1)
+      --yes                 Confirm transmission on a non-virtual interface
+
+Global Flags:
+      --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
+      --slcan-baud int           Serial baud rate of an slcan adapter (USB adapters ignore it) (default 115200)
+      --slcan-bitrate int        Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's) (default 500000)
+      --slcan-data-bitrate int   CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none
+```
+
+## canbusctl xl monitor
+
+```text
+xl monitor receives every frame of a CAN XL interface, CAN XL and CAN or
+CAN FD alike, and prints them until --count frames, --duration or Ctrl-C. It
+never transmits. --output also writes them to a candump log (.log) or JSON
+Lines (.jsonl) trace, the formats that carry CAN XL.
+
+Usage:
+  canbusctl xl monitor [flags]
+
+Flags:
+  -n, --count int           Stop after this many frames (0: no limit)
+      --duration duration   Stop after this time (0: until Ctrl-C)
+  -h, --help                help for monitor
+  -i, --interface string    SocketCAN interface with the CAN XL MTU (required)
+  -o, --output string       Also write the frames to this trace file (.log or .jsonl)
 
 Global Flags:
       --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")

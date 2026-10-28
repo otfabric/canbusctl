@@ -14,6 +14,8 @@ canbusctl dbc encode vehicle.dbc Engine Speed=1500 Gear=Second
 canbusctl send -i vcan0 123#DEADBEEF                         # vcan: no confirmation needed
 canbusctl record -i can0 -o trip.blf --duration 10m          # .log .jsonl .pcap .asc .blf .trc
 canbusctl monitor -i slcan:/dev/ttyACM0 --slcan-bitrate 250000 # a CANable on any OS, listen-only
+canbusctl xl send -i vcanxl0 00242#80:03:00C0FFEE#11223344  # CAN XL (mtu 2060, Linux ≥ 6.2)
+canbusctl xl monitor -i vcanxl0 -o xl.log                    # CAN, CAN FD and CAN XL frames
 canbusctl trace convert trip.blf trip.asc                    # reports what ASC cannot keep
 canbusctl replay trip.blf -i vcan0 --speed 2
 canbusctl dbc convert system.arxml --to kcd -o system.kcd
@@ -70,6 +72,7 @@ CAN frames can move brakes, drives and power electronics. canbusctl is
 | Kernel ISO-TP (`--kernel`) | ✓ (can-isotp module) | exit 8 | exit 8 |
 | Userspace ISO-TP | ✓ | on `virtual` | on `virtual` |
 | Serial-line CAN adapters (`-i slcan:/dev/ttyACM0`, `slcan:COM3`, `slcan:tcp://host:port`) | ✓ | ✓ | ✓ |
+| CAN XL (`xl send`, `xl monitor`; SocketCAN interface with mtu 2060) | ✓ (Linux ≥ 6.2) | exit 8 | exit 8 |
 | `dbc` commands, traces (candump, JSON Lines, pcap, pcapng, ASC, BLF, TRC) | ✓ | ✓ | ✓ |
 | In-process virtual bus (`-i virtual`: simulate, inject, replay) | ✓ | ✓ | ✓ |
 
