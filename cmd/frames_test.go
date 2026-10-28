@@ -3,6 +3,8 @@
 package cmd
 
 import (
+	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/otfabric/go-canbus"
 	"github.com/otfabric/go-canbus/capture"
+	"github.com/otfabric/go-canbus/virtual"
 )
 
 func vehicleFrames(t *testing.T) []canbus.Frame {
@@ -36,6 +39,50 @@ func TestMonitor(t *testing.T) {
 	}
 	r = runWithTraffic(t, vehicleFrames(t), "monitor", "-i", "virtual", "--duration", "50ms", "--errors")
 	want(t, r, 0, "frames, 0 dropped")
+	// --errors shows error frames; without it they are not shown.
+	for _, errs := range []bool{true, false} {
+		resetVirtual()
+		vb := sharedVirtual()
+		go func(vb *virtual.Bus) {
+			for i := 0; i < 200; i++ {
+				_ = vb.InjectError(context.Background(), canbus.ErrorInfo{Class: canbus.ErrClassBusOff})
+				time.Sleep(2 * time.Millisecond)
+			}
+		}(vb)
+		args := []string{"monitor", "-i", "virtual", "--duration", "150ms"}
+		if errs {
+			args = append(args, "--errors", "-n", "1")
+		}
+		var out, errOut bytes.Buffer
+		code := Run(context.Background(), args, strings.NewReader(""), &out, &errOut)
+		if code != 0 || errs != strings.Contains(out.String(), "bus-off") {
+			t.Fatalf("--errors=%v: exit %d\n%s%s", errs, code, out.String(), errOut.String())
+		}
+		// record --errors writes them to the trace.
+		resetVirtual()
+		vb = sharedVirtual()
+		go func(vb *virtual.Bus) {
+			for i := 0; i < 200; i++ {
+				_ = vb.InjectError(context.Background(), canbus.ErrorInfo{Class: canbus.ErrClassBusOff})
+				time.Sleep(2 * time.Millisecond)
+			}
+		}(vb)
+		file := filepath.Join(t.TempDir(), "errors.log")
+		args = []string{"record", "-i", "virtual", "-o", file, "--duration", "150ms"}
+		if errs {
+			args = append(args, "--errors", "-n", "1")
+		}
+		out.Reset()
+		errOut.Reset()
+		if code := Run(context.Background(), args, strings.NewReader(""), &out, &errOut); code != 0 {
+			t.Fatalf("record: exit %d\n%s", code, errOut.String())
+		}
+		if errs {
+			want(t, run(t, "", "trace", "info", file), 0, "error 1")
+		} else if b, _ := os.ReadFile(file); len(b) != 0 {
+			t.Fatalf("record without --errors wrote %q", b)
+		}
+	}
 	want(t, run(t, "", "monitor", "-i", "virtual", "--filter", "zz"), 3, "--filter")
 	want(t, run(t, "", "monitor"), 2, "interface")
 	want(t, run(t, "", "monitor", "-i", "virtual", "--dbc", "testdata/missing.dbc"), 3)

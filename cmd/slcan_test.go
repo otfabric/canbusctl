@@ -19,6 +19,7 @@ import (
 type adapter struct {
 	ln    net.Listener
 	conns chan net.Conn
+	raw   net.Conn // the last accepted connection, for raw records
 }
 
 func newAdapter(t *testing.T) *adapter {
@@ -67,6 +68,7 @@ func (a *adapter) accept(t *testing.T) ([]string, *slcan.Conn) {
 		}
 	}
 	_ = c.SetReadDeadline(time.Time{})
+	a.raw = c
 	conn, err := slcan.New(bufConn{r, c}, slcan.Config{NoCommands: true})
 	if err != nil {
 		t.Fatal(err)
@@ -104,6 +106,34 @@ func TestSlcanMonitorListenOnly(t *testing.T) {
 	want(t, r, 0, "123#A1B2", "123#")
 	if strings.Contains(r.out, "456#") || strings.Contains(r.out, "18DAF110") {
 		t.Fatal(r.out)
+	}
+}
+
+// TestSlcanMonitorErrors: an adapter's status records ("e" bus errors,
+// "s" state changes) are shown as error frames with --errors, and not
+// without it.
+func TestSlcanMonitorErrors(t *testing.T) {
+	for _, withErrors := range []bool{true, false} {
+		ad := newAdapter(t)
+		args := []string{"monitor", "-i", ad.iface(), "-n", "1", "--duration", "10s"}
+		if withErrors {
+			args = append(args, "--errors", "-n", "3")
+		}
+		done := make(chan result, 1)
+		go func() { done <- run(t, "", args...) }()
+		ad.accept(t)
+		if _, err := ad.raw.Write([]byte("e1a\rsp000140\rt1231AB\r")); err != nil {
+			t.Fatal(err)
+		}
+		r := <-done
+		want(t, r, 0, "123#AB")
+		errs := strings.Count(r.out, "ERRORFRAME") + strings.Count(r.out, "error")
+		if withErrors && !strings.Contains(r.out, "no-ack") || !withErrors && errs != 0 {
+			t.Fatalf("--errors=%v:\n%s", withErrors, r.out)
+		}
+		if withErrors && !strings.Contains(r.out, "tx-passive") {
+			t.Fatalf("no state change in:\n%s", r.out)
+		}
 	}
 }
 
