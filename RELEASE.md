@@ -6,6 +6,17 @@ with the version bump). It computes the tag, builds the binaries for linux
 publishes the GitHub release with the section of this file that matches the
 version as its notes. Add the section before running it.
 
+## v0.2.1
+
+**Date:** 2026-10-28
+**Previous release:** v0.2.0
+
+canbusctl on go-canbus v0.2.1. go-canbus now reports a socket deadline that
+fires a moment before the command's own deadline as that deadline, and
+`chaos.Bridge.Run` returns nil when its context ends during a send; the
+workarounds canbusctl v0.2.0 carried for both are removed. Commands behave as
+in v0.2.0.
+
 ## v0.2.0
 
 **Date:** 2026-10-28

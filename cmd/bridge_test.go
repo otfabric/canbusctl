@@ -4,10 +4,8 @@ package cmd
 
 import (
 	"context"
-	"os"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/otfabric/go-canbus"
 	"github.com/otfabric/go-canbus/chaos"
@@ -47,15 +45,13 @@ func TestInjectReorder(t *testing.T) {
 	}
 }
 
-func TestEndedEarlyDeadline(t *testing.T) {
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
-	defer cancel()
-	// The context's timer has fired by now; a deadline error from a
-	// socket is a normal end, other errors are not.
-	if !ended(ctx, os.ErrDeadlineExceeded) || !ended(ctx, canbus.ErrTimeout) || ended(ctx, canbus.ErrClosed) {
-		t.Fatal("ended")
+func TestEnded(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	if !ended(ctx, context.DeadlineExceeded) || ended(ctx, context.Canceled) || ended(ctx, canbus.ErrClosed) {
+		t.Fatal("ended before cancel")
 	}
-	if ended(context.Background(), canbus.ErrTimeout) {
-		t.Fatal("no deadline")
+	cancel()
+	if !ended(ctx, context.Canceled) || ended(ctx, canbus.ErrTimeout) {
+		t.Fatal("ended after cancel")
 	}
 }

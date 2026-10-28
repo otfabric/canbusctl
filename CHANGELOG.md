@@ -3,6 +3,12 @@
 All notable changes are listed here; release notes are in
 [RELEASE.md](RELEASE.md).
 
+## v0.2.1 (2026-10-28)
+
+Built on go-canbus v0.2.1, which reports a socket deadline that fires a
+moment before the context's own as the context's deadline: canbusctl's own
+workarounds for that edge case are removed (no behaviour change).
+
 ## v0.2.0 (2026-10-28)
 
 Trace formats ASC and BLF everywhere (`record`, `replay`, `monitor -o`,
