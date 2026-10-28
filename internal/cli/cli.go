@@ -20,6 +20,7 @@ import (
 
 	"github.com/otfabric/canbusctl/internal/errs"
 	"github.com/otfabric/go-canbus"
+	"github.com/otfabric/go-canbus/arxml"
 	"github.com/otfabric/go-canbus/candb"
 	"github.com/otfabric/go-canbus/capture"
 	"github.com/otfabric/go-canbus/dbc"
@@ -127,15 +128,15 @@ func LoadDatabase(path string) (*candb.Database, []candb.Diagnostic, string, err
 	if err != nil {
 		return nil, nil, "", errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot read database: %w", err)
 	}
-	kind := "dbc"
-	if strings.EqualFold(filepath.Ext(path), ".kcd") || bytes.HasPrefix(bytes.TrimSpace(src), []byte("<")) {
-		kind = "kcd"
-	}
+	kind := DatabaseKind(path, src)
 	var db *candb.Database
 	var diags []candb.Diagnostic
-	if kind == "kcd" {
+	switch kind {
+	case "kcd":
 		db, diags, err = kcd.Parse(bytes.NewReader(src))
-	} else {
+	case "arxml":
+		db, diags, err = arxml.Parse(bytes.NewReader(src))
+	default:
 		db, diags, err = dbc.ParseBytes(src)
 	}
 	if err != nil {
@@ -143,6 +144,28 @@ func LoadDatabase(path string) (*candb.Database, []candb.Diagnostic, string, err
 			Message: fmt.Sprintf("%s: %v", path, err), Cause: err}
 	}
 	return db, diags, kind, nil
+}
+
+// DatabaseKind tells DBC, KCD and ARXML apart: by extension, else by
+// content (XML with an AUTOSAR root is ARXML, other XML is KCD).
+func DatabaseKind(path string, src []byte) string {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".kcd":
+		return "kcd"
+	case ".arxml":
+		return "arxml"
+	case ".dbc":
+		return "dbc"
+	}
+	trim := bytes.TrimSpace(src)
+	if bytes.HasPrefix(trim, []byte("<")) {
+		head := trim[:min(len(trim), 4096)]
+		if bytes.Contains(head, []byte("<AUTOSAR")) {
+			return "arxml"
+		}
+		return "kcd"
+	}
+	return "dbc"
 }
 
 // OpenTrace opens a capture file ("-" for stdin) of any supported format.
@@ -169,19 +192,20 @@ func OpenTrace(path string, stdin io.Reader) (capture.Reader, func(), error) {
 func TraceFormat(path, explicit string) (capture.Format, error) {
 	if explicit != "" {
 		switch capture.Format(explicit) {
-		case capture.FormatCandump, capture.FormatJSONL, capture.FormatPCAP:
+		case capture.FormatCandump, capture.FormatJSONL, capture.FormatPCAP, capture.FormatASC, capture.FormatBLF:
 			return capture.Format(explicit), nil
 		default:
 		}
-		return "", errs.Invalid("unknown trace format %q (candump, jsonl or pcap)", explicit)
+		return "", errs.Invalid("unknown trace format %q (candump, jsonl, pcap, asc or blf)", explicit)
 	}
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".jsonl", ".json":
-		return capture.FormatJSONL, nil
-	case ".pcap":
-		return capture.FormatPCAP, nil
+	switch f := capture.FormatFromPath(path); f {
+	case "", capture.FormatCandump:
+		return capture.FormatCandump, nil
+	case capture.FormatPCAPNG:
+		return "", errs.New(errs.KindUnsupported, errs.CodeUnsupported, "pcapng is read, not written: use .pcap")
+	default:
+		return f, nil
 	}
-	return capture.FormatCandump, nil
 }
 
 // ReadLines reads non-empty lines (for frames given on stdin).

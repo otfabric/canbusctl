@@ -121,7 +121,7 @@ func newSimulateCmd(a *app) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "simulate",
 		Short: "Generate deterministic traffic of a database's messages at their cycle times",
-		Long: `simulate sends the messages of a DBC or KCD database at their cycle times
+		Long: `simulate sends the messages of a DBC, KCD or ARXML database at their cycle times
 (GenMsgCycleTime / interval; --default-cycle for the others) with signal values
 from --pattern: counter (the step number), random (seeded by --seed) or initial.
 The same seed and database give the same frames. With --interface virtual the
@@ -228,7 +228,7 @@ is sent; on any other interface it needs --yes. --duration (default 10s),
 	}
 	f := c.Flags()
 	f.StringVarP(&iface, "interface", "i", cli.Virtual, "CAN interface, or \"virtual\" (in this process)")
-	f.StringVar(&dbPath, "dbc", "", "DBC or KCD database (required)")
+	f.StringVar(&dbPath, "dbc", "", "DBC, KCD or ARXML database (required)")
 	f.StringVar(&pattern, "pattern", "counter", "Signal values: counter, random or initial")
 	f.StringSliceVar(&msgs, "message", nil, "Simulate only these messages (repeatable)")
 	f.Int64Var(&seed, "seed", 1, "Seed of the random pattern")

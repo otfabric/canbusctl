@@ -24,14 +24,15 @@ jobs:
       coverpkg: ./...
     secrets: inherit
 
-  # The commands on a real vcan interface, natively on amd64 and arm64.
-  # CANBUS_REQUIRE_VCAN=1 turns a missing interface into a failure. Hosted
-  # runners have no can-isotp module: the kernel ISO-TP test skips unless
-  # the module loads.
+  # The commands on real vcan interfaces (vcan0, vcan1), natively on amd64
+  # and arm64, one package at a time (they share the interfaces), with the
+  # end-to-end and chaos tests of the built binary. CANBUS_REQUIRE_VCAN=1
+  # turns a missing interface into a failure; where can-isotp loads (or is
+  # built from the kernel's source) the kernel ISO-TP tests must pass.
   vcan:
     name: vcan (${{ matrix.arch }})
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -43,20 +44,18 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - name: Load the CAN modules and create vcan0
+      - name: Load the CAN modules and create vcan0 and vcan1
+        id: modules
         run: |
-          # vcan ships in linux-modules-extra on some runner kernels and in the
-          # base modules on others; the extra package does not exist for every
-          # kernel.
-          if ! sudo modprobe vcan; then
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq "linux-modules-extra-$(uname -r)"
-            sudo modprobe vcan
-          fi
-          sudo modprobe can-isotp || echo "::warning::can-isotp is not available on $(uname -r): kernel ISO-TP tests skip"
-          sudo ip link add vcan0 type vcan
-          sudo ip link set vcan0 mtu 72 up
-      - name: Tests with the race detector
+          scripts/ci-can-modules.sh
+          if lsmod | grep -q can_isotp; then echo "isotp=1" >> "$GITHUB_OUTPUT"; fi
+          for i in vcan0 vcan1; do
+            sudo ip link add "$i" type vcan
+            sudo ip link set "$i" mtu 72 up
+          done
+      - name: Tests with the race detector (end-to-end and chaos included)
+        env:
+          CANBUS_REQUIRE_ISOTP: ${{ steps.modules.outputs.isotp }}
         run: make test-vcan
       - name: Coverage (minimum 90 %)
         run: CANBUS_REQUIRE_VCAN=1 make coverage

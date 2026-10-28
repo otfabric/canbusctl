@@ -9,6 +9,7 @@ import (
 
 	"github.com/otfabric/go-canbus"
 	"github.com/otfabric/go-canbus/candb"
+	"github.com/otfabric/go-canbus/capture"
 )
 
 func TestParseID(t *testing.T) {
@@ -90,8 +91,19 @@ func TestTraceFormat(t *testing.T) {
 	if f, _ := TraceFormat("a.log", "pcap"); f != "pcap" {
 		t.Fatal(f)
 	}
-	if _, err := TraceFormat("a", "asc"); err == nil {
-		t.Fatal("asc")
+	for p, want := range map[string]string{"a.asc": "asc", "a.BLF": "blf"} {
+		if f, err := TraceFormat(p, ""); err != nil || string(f) != want {
+			t.Error(p, f, err)
+		}
+	}
+	if f, _ := TraceFormat("a", "blf"); f != "blf" {
+		t.Fatal(f)
+	}
+	if _, err := TraceFormat("a", "mf4"); err == nil {
+		t.Fatal("mf4")
+	}
+	if _, err := TraceFormat("a.pcapng", ""); err == nil {
+		t.Fatal("pcapng")
 	}
 	lines, _ := ReadLines(strings.NewReader("a\n\n# c\n b \n"))
 	if len(lines) != 2 || lines[1] != "b" {
@@ -134,6 +146,37 @@ func FuzzParseFilters(f *testing.F) {
 		fs, err := ParseFilters([]string{s}, false, false)
 		if err == nil && len(fs.Filters) != 1 {
 			t.Fatal("filter lost")
+		}
+	})
+}
+
+func FuzzTraceFormat(f *testing.F) {
+	for _, s := range []string{"a.asc", "b.BLF", "c.pcapng", "d", "e.jsonl"} {
+		f.Add(s, "")
+	}
+	f.Add("x", "blf")
+	f.Fuzz(func(t *testing.T, path, explicit string) {
+		format, err := TraceFormat(path, explicit)
+		if err != nil {
+			return
+		}
+		switch format {
+		case capture.FormatCandump, capture.FormatJSONL, capture.FormatPCAP, capture.FormatASC, capture.FormatBLF:
+		default:
+			t.Fatalf("%q/%q: unwritable format %q accepted", path, explicit, format)
+		}
+	})
+}
+
+func FuzzDatabaseKind(f *testing.F) {
+	f.Add("a.dbc", []byte("VERSION \"\""))
+	f.Add("a", []byte("<?xml version=\"1.0\"?><AUTOSAR>"))
+	f.Add("a.xml", []byte("<NetworkDefinition>"))
+	f.Fuzz(func(t *testing.T, path string, src []byte) {
+		switch k := DatabaseKind(path, src); k {
+		case "dbc", "kcd", "arxml":
+		default:
+			t.Fatalf("kind %q", k)
 		}
 	})
 }

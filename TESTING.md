@@ -3,9 +3,11 @@
 | Command | What |
 |---------|------|
 | `make test` | All tests with the race detector; Linux interface tests skip without vcan0 |
-| `make test-vcan` | The same on Linux, failing (not skipping) when vcan0 is missing |
+| `make test-vcan` | The same on Linux, one package at a time, failing (not skipping) when vcan0 or vcan1 is missing |
 | `make coverage` | Whole-module coverage (`-coverpkg=./...`), gated at 90 % |
-| `make fuzz` | Fuzz targets of the structured inputs: frame notation, `signal=value`, filters |
+| `make e2e` | End-to-end tests of the built binary (Linux parts need vcan0, vcan1) |
+| `make interop` | The binary against the canbus-interop images (Docker, vcan0) |
+| `make fuzz` | Fuzz targets of the structured inputs: frame notation, `signal=value`, filters, trace format, database kind |
 | `make cross` | vet for every release platform, linux/arm (32-bit) included |
 | `make check` | fmt, staticcheck, golangci-lint, vet, cross, govulncheck, test, coverage |
 
@@ -16,24 +18,60 @@ frames on it; ISO-TP sender and receiver run as two concurrent invocations.
 Golden files (`cmd/testdata/golden`, regenerate with
 `go test ./cmd -update`) pin `dbc inspect` and `dbc decode` output.
 
-**vcan tests** (`cmd/vcan_linux_test.go`) exercise interfaces, info, stats,
-monitor, record, send, send-fd, replay, simulate and inject on a real vcan
-interface, and an ISO-TP transfer between the userspace sender and a kernel
-ISO-TP receiver (`--kernel`). They need
+**vcan tests** (`cmd/*_linux_test.go`) exercise interfaces, info, stats,
+monitor (with `-o`), record, send, send-fd, replay, simulate, inject and
+bridge (vcan0 ↔ virtual, vcan0 ↔ vcan1 under faults) on real vcan
+interfaces, and ISO-TP between the userspace stack and the kernel in both
+directions (`--kernel`, `--fc-delay`). They need
 
 ```sh
 sudo modprobe vcan; sudo modprobe can-isotp
-sudo ip link add vcan0 type vcan && sudo ip link set vcan0 mtu 72 up
+for i in vcan0 vcan1; do sudo ip link add $i type vcan && sudo ip link set $i mtu 72 up; done
 ```
+
+Packages share the interfaces: run them with `go test -p 1` (the make
+targets do).
+
+**End-to-end tests** (`e2e/`) build the binary and drive it as separate
+processes: a simulated trace through every format (candump → JSON Lines →
+pcap → ASC → BLF → candump …) decoding identically, KCD round trips; on
+Linux, replay → record → convert → replay → monitor on vcan for every
+format, ISO-TP between two canbusctl processes and against the kernel, a
+bridge process between vcan0 and vcan1.
+
+**Chaos tests** (`e2e`, `TestChaosISOTPThroughBridge`): ISO-TP through a
+bridge process that drops, duplicates and delays frames, over several seeds,
+never delivers wrong data (the receiver reports the exact message or an
+error), some messages get through, and with every fault (reorder and corrupt
+too) all processes return by their deadlines.
+
+**Interop tests** (`interop/`, build tag `interop`) run the binary against
+the pinned canbus-interop images: `send`/`send-fd` → can-utils and python-can
+receivers; their senders → `monitor --format json`; `isotp send`/`receive`
+↔ the kernel (can-utils) and python-can-isotp, and `--kernel` →
+python-can-isotp; `dbc decode`/`encode` against cantools and canmatrix (DBC
+and ARXML fixtures); `dbc convert --to kcd` read back by canmatrix; `record`
+.asc/.blf/.log read by python-can (`log-convert`). A capability an image
+lacks is a recorded skip, never a pass; deliberate differences are recorded
+as known differences (`CANBUS_INTEROP_REPORT` writes the matrix).
+
+**Kernels workflow**: the vcan, kernel ISO-TP, bridge, end-to-end and chaos
+tests also run in virtme-ng microVMs booted with the Ubuntu generic kernel
+and mainline 6.1, 6.6, 6.12 and 6.18 (`scripts/microvm-test.sh`).
 
 `CANBUS_REQUIRE_VCAN=1` turns a missing interface into a failure;
 `CANBUS_REQUIRE_ISOTP=1` does the same for the can-isotp module, which
 GitHub's hosted runners lack (the kernel ISO-TP test skips there and runs in
 local Linux VMs).
 
-**Results at the time of v0.1.0** (Linux arm64 VM, kernel 7.0, vcan0 and
-can-isotp): all tests pass with `-race`; whole-module coverage 94.5 %
-(macOS, without the vcan tests: 94.4 %).
+**Results at the time of v0.2.0** (Linux arm64 VM, kernel 7.0, vcan0, vcan1
+and can-isotp): all tests pass with `-race`; whole-module coverage 94.2 %.
+Interop with the pinned canbus-interop v0.2.0 images (contract 1.1): 63 pass,
+27 known differences, no skips (with the v0.1.0 images, which lack ARXML and
+log-convert: 54 pass, 19 known differences, 9 skips).
+
+At v0.1.0: whole-module coverage 94.5 % (macOS, without the vcan tests:
+94.4 %).
 
 **Not tested here:** real CAN controllers (bit timing changes, bus-off, error
 counters) — `configure` with real hardware is covered by the request encoding

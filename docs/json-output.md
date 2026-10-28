@@ -10,8 +10,8 @@ changes only with an incompatible change. Schemas:
 ## Results
 
 Commands with one result (interfaces, info, configure, up, down, send, send-fd,
-record, replay, stats, dbc inspect/validate/encode, isotp send, simulate,
-inject, version) write one indented document:
+record, replay, stats, dbc inspect/validate/encode, isotp send, trace
+convert/info, simulate, inject, bridge, version) write one indented document:
 
 ```json
 {
@@ -25,6 +25,13 @@ inject, version) write one indented document:
   }
 }
 ```
+
+`trace convert` reports `read`, `written`, `filtered` and `losses` (what the
+target format could not keep); `trace info` the frame kinds and per-identifier
+`ids` (`frames`, `rateHz`, `minLen`, `maxLen`); `bridge` the counters of each
+direction (`aToB`, `bToA`: `received`, `forwarded`, `dropped`, `duplicated`,
+`delayed`, `reordered`, `corrupted`). `inject`'s `faults` has the same
+counters (v0.2.0: `received`, `forwarded` and `reordered` are new).
 
 ## Streams
 

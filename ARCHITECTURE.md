@@ -9,14 +9,18 @@ cmd/                    one file per command group (cobra)
   root.go               Run(ctx, args, stdin, stdout, stderr) → exit code; --format; version; completion
   interfaces.go         interfaces, info, configure, up, down     → go-canbus/socketcan/link
   frames.go             monitor, send, send-fd, record, replay, stats → canbus.Bus, capture
-  dbc.go                dbc inspect/validate/decode/encode/generate/convert → candb, dbc, kcd, codegen
+  dbc.go                dbc inspect/validate/decode/encode/generate/convert → candb, dbc, kcd, arxml, codegen
   isotp.go              isotp send/receive (isotp, socketcan.DialISOTP), monitor (listen-only isotp.Conn)
   simulate.go           deterministic traffic from a database
-  inject.go             fault stage (virtual.Bus with seeded faults) in front of the target
+  inject.go             chaos.Bridge between two private virtual buses in front of the target
+  bridge.go             bridge: one chaos.Bridge per direction between two interfaces
+  trace.go              trace convert/info → capture (candump, JSON Lines, pcap/pcapng, ASC, BLF)
   transport.go          opens an interface: socketcan.Open, or a port of the in-process virtual bus
 internal/cli            identifiers, frames, filters, signal=value, databases, traces, transmit safety
 internal/output         text, table, JSON envelope, JSON Lines streams
 internal/errs           kinds, stable codes, exit codes, classification of go-canbus errors
+e2e/                    tests of the built binary as separate processes (incl. chaos)
+interop/                tests of the binary against the canbus-interop images (build tag interop)
 ```
 
 **Run, not os.Exit.** `cmd.Run` takes its streams and returns the exit code,
@@ -36,6 +40,15 @@ Administrative commands need `--yes` regardless.
 `errs.Classify` maps go-canbus sentinels (ErrUnsupported, ErrInterfaceDown,
 isotp.ErrTimeout, candb.ErrRange, ...) to kinds and exit codes. cobra's own
 command-line errors are usage errors (2).
+
+**Faults.** `bridge` and `inject` share the go-canbus `chaos` package (and
+the `faultFlags` of `cmd/bridge.go`): the same seed gives the same decisions
+for the same traffic. `inject` puts a bridge between two private virtual
+buses, then adds error and malformed frames after it.
+
+**Deadlines.** Streams end normally when their context ends; a socket's own
+deadline, set from the context, can fire a moment earlier, so `ended` also
+accepts a deadline error once the context's deadline has passed.
 
 **Listen-only ISO-TP.** `isotp monitor` opens two go-canbus ISO-TP
 connections with `ListenOnly` (one per direction): they reassemble messages

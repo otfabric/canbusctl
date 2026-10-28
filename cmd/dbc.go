@@ -20,15 +20,17 @@ import (
 	"github.com/otfabric/go-canbus/candb"
 	"github.com/otfabric/go-canbus/codegen"
 	"github.com/otfabric/go-canbus/dbc"
+	"github.com/otfabric/go-canbus/kcd"
 	"github.com/spf13/cobra"
 )
 
 func newDBCCmd(a *app) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "dbc",
-		Short: "Inspect, validate, decode, encode, generate and convert CAN databases (DBC, KCD)",
-		Long: `The dbc commands take DBC files and KCD (Kayak) files, recognised by the .kcd
-extension or XML content. DBC is a database format describing messages and
+		Short: "Inspect, validate, decode, encode, generate and convert CAN databases (DBC, KCD, ARXML)",
+		Long: `The dbc commands take DBC files, KCD (Kayak) files and AUTOSAR 4.x ARXML
+system descriptions (their CAN part), recognised by the .kcd and .arxml
+extensions or by content. DBC is a database format describing messages and
 signals, not a protocol. None of these commands touches a CAN interface.`,
 	}
 	c.AddCommand(newDBCInspectCmd(a), newDBCValidateCmd(a), newDBCDecodeCmd(a), newDBCEncodeCmd(a), newDBCGenerateCmd(a), newDBCConvertCmd(a))
@@ -253,10 +255,11 @@ func newDBCDecodeCmd(a *app) *cobra.Command {
 		Use:   "decode <database> [frame...]",
 		Short: "Decode frames given as arguments, in a trace file (--trace) or on stdin",
 		Long: `decode prints the signals of each frame of a known message. Frames come as
-cansend notation arguments, from a candump/JSON Lines/pcap trace (--trace, "-"
-for stdin), or, without either, as lines of cansend notation or candump log on
-stdin. A frame that does not decode (too short, bad multiplexer) makes the exit
-code 1; frames of unknown messages do too with --strict.`,
+cansend notation arguments, from a trace file (--trace: candump, JSON Lines,
+pcap/pcapng, ASC or BLF; "-" for stdin), or, without either, as lines of
+cansend notation or candump log on stdin. A frame that does not decode (too
+short, bad multiplexer) makes the exit code 1; frames of unknown messages do
+too with --strict.`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			db, _, _, err := cli.LoadDatabase(args[0])
@@ -467,9 +470,11 @@ func newDBCConvertCmd(a *app) *cobra.Command {
 	var to, out string
 	c := &cobra.Command{
 		Use:   "convert <database>",
-		Short: "Convert a database: DBC or KCD to DBC, or to the JSON model",
-		Long: `Supported conversions: dbc→dbc (normalised), kcd→dbc, dbc→json and kcd→json
-(the format-independent model). Writing KCD or ARXML is not supported.`,
+		Short: "Convert a database: DBC, KCD or ARXML to DBC, KCD or the JSON model",
+		Long: `Reads DBC, KCD or AUTOSAR 4.x ARXML (the CAN subset) and writes DBC, KCD
+or the JSON model (--to dbc|kcd|json). Writing ARXML is not supported.
+KCD cannot carry extended multiplexing (an error), attributes, value tables
+and initial values (dropped, reported as warnings on stderr).`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			db, _, _, err := cli.LoadDatabase(args[0])
@@ -482,6 +487,14 @@ func newDBCConvertCmd(a *app) *cobra.Command {
 				if err := dbc.Write(&buf, db); err != nil {
 					return err
 				}
+			case "kcd":
+				diags, err := kcd.Write(&buf, db)
+				for _, d := range diags {
+					_, _ = fmt.Fprintln(a.errOut, d.String())
+				}
+				if err != nil {
+					return errs.New(errs.KindUnsupported, errs.CodeUnsupported, "%v", err)
+				}
 			case "json":
 				js, err := codegen.GenerateJSON(db, codegen.Options{Source: filepath.Base(args[0])})
 				if err != nil {
@@ -489,12 +502,12 @@ func newDBCConvertCmd(a *app) *cobra.Command {
 				}
 				buf.Write(js)
 			default:
-				return errs.New(errs.KindUnsupported, errs.CodeUnsupported, "--to %q is not supported (dbc or json)", to)
+				return errs.New(errs.KindUnsupported, errs.CodeUnsupported, "--to %q is not supported (dbc, kcd or json)", to)
 			}
 			return a.writeOut(out, buf.Bytes())
 		},
 	}
-	c.Flags().StringVar(&to, "to", "", "Target format: dbc or json (required)")
+	c.Flags().StringVar(&to, "to", "", "Target format: dbc, kcd or json (required)")
 	c.Flags().StringVarP(&out, "output", "o", "", "Output file (default: stdout)")
 	_ = c.MarkFlagRequired("to")
 	return c

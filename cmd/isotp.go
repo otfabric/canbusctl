@@ -22,7 +22,7 @@ type isotpFlags struct {
 	extendedIDs, fd, brs, kernel                         bool
 	txDL                                                 int
 	bs                                                   uint8
-	stmin                                                time.Duration
+	stmin, fcDelay                                       time.Duration
 	maxSize                                              int
 }
 
@@ -40,6 +40,7 @@ func (o *isotpFlags) add(c *cobra.Command, needTx bool) {
 	f.BoolVar(&o.brs, "brs", false, "CAN FD bit rate switching")
 	f.Uint8Var(&o.bs, "bs", 0, "Block size this receiver grants (0: all)")
 	f.DurationVar(&o.stmin, "stmin", 0, "STmin this receiver asks for (0..127ms, or 100µs..900µs)")
+	f.DurationVar(&o.fcDelay, "fc-delay", 0, "Wait this long before each flow control this receiver sends (N_Br, 0..1s; e.g. 200µs against the kernel's ISO-TP on vcan)")
 	f.StringVar(&o.padding, "padding", "", "Pad frames with this byte (hexadecimal, e.g. CC)")
 	f.IntVar(&o.maxSize, "max-size", 4095, "Largest message accepted")
 	f.BoolVar(&o.kernel, "kernel", false, "Use the Linux kernel's ISO-TP sockets instead of the userspace implementation")
@@ -81,6 +82,7 @@ func (o *isotpFlags) config() (isotp.Config, error) {
 		}
 	}
 	cfg.FD, cfg.TxDL, cfg.BRS, cfg.BlockSize, cfg.STmin, cfg.MaxMessageSize = o.fd, o.txDL, o.brs, o.bs, o.stmin, o.maxSize
+	cfg.FlowControlDelay = o.fcDelay
 	if o.padding != "" {
 		b, err := cli.ParseHexByte(o.padding)
 		if err != nil {
@@ -100,6 +102,9 @@ func (o *isotpFlags) endpoint() (isotp.Endpoint, func(), error) {
 	if o.kernel {
 		if o.iface == cli.Virtual {
 			return nil, nil, errs.Invalid("--kernel needs a SocketCAN interface, not the in-process virtual bus")
+		}
+		if o.fcDelay > 0 {
+			return nil, nil, errs.New(errs.KindUnsupported, errs.CodeUnsupported, "--fc-delay is not available with --kernel: the kernel sends flow control itself")
 		}
 		k, err := socketcan.DialISOTP(o.iface, cfg)
 		if err != nil {
@@ -126,7 +131,12 @@ func newISOTPCmd(a *app) *cobra.Command {
 		Long: `ISO-TP carries messages of up to 4095 bytes (more with CAN FD escape) over CAN.
 The userspace implementation of go-canbus is used by default; --kernel uses the
 Linux kernel's CAN_ISOTP sockets. UDS and other services on top of ISO-TP are not
-interpreted.`,
+interpreted.
+
+Against the kernel's ISO-TP on vcan, a userspace receiver can answer a block
+faster than the kernel sender sees the echo of its own last frame; the kernel
+then drops the flow control and the transfer times out. Give the userspace
+receiver --fc-delay 200us (N_Br) in that setup; real buses are slow enough.`,
 	}
 	c.AddCommand(newISOTPSendCmd(a), newISOTPReceiveCmd(a), newISOTPMonitorCmd(a))
 	return c

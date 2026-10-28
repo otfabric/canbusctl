@@ -31,7 +31,7 @@ func pairRun(t *testing.T, recv, send []string) (result, result) {
 
 func TestISOTPExchange(t *testing.T) {
 	common := []string{"-i", "virtual"}
-	recv := append([]string{"isotp", "receive", "--tx-id", "7E8", "--rx-id", "7E0", "--bs", "4", "--stmin", "1ms", "-n", "2", "--timeout", "10s", "--format", "json", "--max-size", "5000"}, common...)
+	recv := append([]string{"isotp", "receive", "--tx-id", "7E8", "--rx-id", "7E0", "--bs", "4", "--stmin", "1ms", "--fc-delay", "200us", "-n", "2", "--timeout", "10s", "--format", "json", "--max-size", "5000"}, common...)
 	send := append([]string{"isotp", "send", "--tx-id", "7E0", "--rx-id", "7E8", "--size", "4100", "-n", "2", "--padding", "CC", "--max-size", "5000"}, common...)
 	r, s := pairRun(t, recv, send)
 	want(t, s, 0, "sent 2 message(s), 8200 bytes")
@@ -103,6 +103,7 @@ func TestISOTPErrors(t *testing.T) {
 		{[]string{"isotp", "send", "--tx-id", "1", "--rx-id", "2", "--size", "1", "--stmin", "2s"}, 3, "STmin"},
 		{[]string{"isotp", "send", "--tx-id", "1", "--rx-id", "2", "--size", "100", "--timeout", "200ms"}, 5, "deadline"},
 		{[]string{"isotp", "send", "--tx-id", "1", "--rx-id", "2", "--size", "1", "--kernel"}, 3, "--kernel needs"},
+		{[]string{"isotp", "receive", "--tx-id", "1", "--rx-id", "2", "--fc-delay", "2s"}, 3, "FlowControlDelay"},
 		{[]string{"isotp", "receive", "--tx-id", "1", "--rx-id", "2", "--timeout", "50ms"}, 5, "received 0 of 1"},
 		{[]string{"isotp", "receive", "--tx-id", "1", "--rx-id", "2", "--timeout", "50ms", "-n", "0"}, 0, ""},
 		{[]string{"isotp", "receive", "--rx-id", "2"}, 3, "--tx-id"},
@@ -113,6 +114,7 @@ func TestISOTPErrors(t *testing.T) {
 		r := run(t, "", append(c.args, base...)...)
 		want(t, r, c.code, c.msg)
 	}
+	want(t, run(t, "", "isotp", "receive", "-i", "vcan0", "--tx-id", "1", "--rx-id", "2", "--kernel", "--fc-delay", "1ms"), 8, "--fc-delay")
 	if !linux() {
 		want(t, run(t, "", "isotp", "send", "-i", "vcan0", "--tx-id", "1", "--rx-id", "2", "--size", "1", "--kernel", "--yes"), 8)
 	}
