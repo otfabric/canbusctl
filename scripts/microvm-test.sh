@@ -20,7 +20,8 @@ modprobe -a can can-raw vcan can-isotp slcan
 for i in vcan0 vcan1; do ip link add \$i type vcan && ip link set \$i mtu 72 up; done
 export CANBUS_REQUIRE_VCAN=1 CANBUS_REQUIRE_ISOTP=1 TZ=UTC
 cd $PWD/cmd && $out/cmd.test -test.count=1 -test.run 'VCAN'
-cd $PWD/e2e && CANBUS_TEST_ADMIN=1 CANBUS_REQUIRE_SLCAN=1 CANBUSCTL_BIN=$out/canbusctl $out/e2e.test -test.count=1 -test.short -test.run 'VCAN|Chaos|Slcan'
+cd $PWD/e2e && CANBUS_TEST_ADMIN=1 CANBUS_REQUIRE_SLCAN=1 CANBUSCTL_BIN=$out/canbusctl $out/e2e.test -test.count=1 -test.short -test.run 'VCAN|Chaos'
+cd $PWD/e2e && CANBUS_TEST_ADMIN=1 CANBUS_REQUIRE_SLCAN=1 CANBUSCTL_BIN=$out/canbusctl $out/e2e.test -test.count=1 -test.v -test.run 'Slcan'
 echo MICROVM-OK
 GUEST
 start=$(date +%s)

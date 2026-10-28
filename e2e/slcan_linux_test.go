@@ -37,6 +37,9 @@ func kernelSlcan(t *testing.T) (string, string) {
 	}
 	socat, err := exec.LookPath("socat")
 	if err != nil {
+		if os.Getenv("CANBUS_REQUIRE_SLCAN") == "1" {
+			t.Fatal("socat is not installed")
+		}
 		t.Skip("socat is not installed")
 	}
 	dir := t.TempDir()
