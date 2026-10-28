@@ -155,7 +155,7 @@ or ",data"; several filters are ORed, or ANDed with --join.`,
 				return err
 			}
 			defer func() { _ = bus.Close() }()
-			sub, err := bus.Subscribe(canbus.WithQueueSize(65536))
+			sub, err := bus.Subscribe(canbus.WithQueueSize(65536), canbus.WithFilters(fs))
 			if err != nil {
 				return err
 			}
@@ -502,7 +502,7 @@ keeps every field, including nanosecond timestamps.`,
 				return err
 			}
 			defer func() { _ = bus.Close() }()
-			sub, err := bus.Subscribe(canbus.WithQueueSize(65536))
+			sub, err := bus.Subscribe(canbus.WithQueueSize(65536), canbus.WithFilters(fs))
 			if err != nil {
 				return err
 			}

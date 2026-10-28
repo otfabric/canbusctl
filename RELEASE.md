@@ -6,6 +6,42 @@ with the version bump). It computes the tag, builds the binaries for linux
 publishes the GitHub release with the section of this file that matches the
 version as its notes. Add the section before running it.
 
+## v0.4.0
+
+**Date:** 2026-10-28
+**Previous release:** v0.3.0
+
+## Summary
+
+Error frames reach `monitor --errors` and `record --errors` again, slcan
+adapters report their status, and ARXML databases may use multiplexed
+PDUs. Built on go-canbus v0.4.0.
+
+## Fixes
+
+- **`--errors` showed no error frames.** `monitor` and `record` asked the
+  interface for error frames but subscribed without them, so they were
+  dropped before display on every interface type. New tests inject
+  error frames on the virtual bus and fail without the fix.
+
+## Additions
+
+- **slcan adapter status.** "e" (bus error) and "s" (controller state,
+  error counters) records from an adapter become error frames, decoded as
+  the Linux slcan driver decodes them (go-canbus v0.4.0): `monitor -i
+  slcan:… --errors` shows ACK errors, warning, passive and bus-off.
+  Filters on slcan now run inside go-canbus (`Conn.SetFilters`).
+- **Multiplexed ARXML PDUs** in `--dbc` databases and `db` commands:
+  MULTIPLEXED-I-PDUs read as cantools reads them (selector
+  `<frame>_selector1`).
+
+## Verification
+
+- INTEROP_SUMMARY
+- Coverage COVERAGE_SUMMARY.
+
+---
+
 ## v0.3.0
 
 **Date:** 2026-10-28

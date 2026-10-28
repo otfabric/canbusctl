@@ -3,7 +3,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -68,27 +67,10 @@ func openSlcan(iface string, o openOpts) (canbus.Transport, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s: %v", canbus.ErrInterfaceDown, iface, err)
 	}
-	if o.filters != nil && (len(o.filters.Filters) > 0 || o.filters.Join) {
-		return &softFiltered{c, *o.filters}, nil
+	if o.filters != nil {
+		_ = c.SetFilters(*o.filters) // in software; never fails
 	}
 	return c, nil
-}
-
-// softFiltered applies filters in software: slcan adapters have none.
-type softFiltered struct {
-	*slcan.Conn
-	fs canbus.FilterSet
-}
-
-func (s *softFiltered) Receive(ctx context.Context, f *canbus.Frame) error {
-	for {
-		if err := s.Conn.Receive(ctx, f); err != nil {
-			return err
-		}
-		if s.fs.Match(f) {
-			return nil
-		}
-	}
 }
 
 // The in-process virtual bus ("--interface virtual"), shared by the ports

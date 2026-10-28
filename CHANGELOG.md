@@ -3,6 +3,14 @@
 All notable changes are listed here; release notes are in
 [RELEASE.md](RELEASE.md).
 
+## v0.4.0 (2026-10-28)
+
+`monitor --errors` and `record --errors` now show and record error frames
+(the subscription dropped them before). slcan adapters' status records
+("e" bus errors, "s" state changes) arrive as error frames; filters on
+slcan run in go-canbus. ARXML databases with multiplexed PDUs decode and
+encode. Built on go-canbus v0.4.0.
+
 ## v0.3.0 (2026-10-28)
 
 Serial-line CAN adapters on every OS: `--interface slcan:<device>` or

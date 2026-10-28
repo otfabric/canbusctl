@@ -23,7 +23,7 @@ var dbcFixtures = []struct {
 	{"mux", "dbcMultiplexing"}, {"extmux", "dbcExtendedMultiplexing"}, {"fd", "dbcFD"},
 }
 
-var arxmlFixtures = []string{"basic", "fd", "pdu-offset"}
+var arxmlFixtures = []string{"basic", "fd", "pdu-offset", "multiplexed"}
 
 // knownDifference is a disagreement between go-canbus (canbusctl) and an
 // oracle that is a deliberate choice, recorded as "known-difference".
@@ -35,7 +35,9 @@ var knownDifferences = []knownDifference{
 	{"cantools", "pdu-offset", "", "cantools places a PDU mapped at a byte offset of its frame at offset 0; go-canbus applies START-POSITION (AUTOSAR)"},
 	{"canmatrix", "pdu-offset", "", "canmatrix places a PDU mapped at a byte offset of its frame at offset 0; go-canbus applies START-POSITION (AUTOSAR)"},
 	{"canmatrix", "extmux", "EncodingComplexMultiplexed", "canmatrix decodes extended multiplexing but cannot encode it"},
-	{"cantools", "", "but got 3", "cantools rejects a multiplexer value that selects no multiplexed signal; go-canbus decodes the switch and the always-present signals"},
+	{"canmatrix", "multiplexed", "", "canmatrix 1.3.3 reads only the selector of a multiplexed I-PDU, none of its signals; checked against cantools"},
+	{"cantools", "", "expected multiplexer id", "cantools rejects a multiplexer value that selects no multiplexed signal; go-canbus decodes the switch and the always-present signals"},
+	{"cantools", "", "A valid value for the multiplexer selector signal", "cantools rejects a multiplexer value that selects no multiplexed signal; go-canbus encodes the switch and the always-present signals"},
 	{"canmatrix", "", "payload longer than the message", "canmatrix rejects payloads longer than the message; go-canbus decodes the first Length bytes"},
 }
 
