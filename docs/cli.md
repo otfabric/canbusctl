@@ -42,7 +42,7 @@ Available Commands:
   interfaces  List the CAN interfaces of this host (Linux)
   isotp       Send, receive and monitor ISO-TP (ISO 15765-2) messages
   monitor     Print the frames of an interface as they arrive (passive)
-  record      Record frames to a candump log, JSON Lines, pcap, ASC, BLF or TRC file (passive)
+  record      Record frames to a candump log, JSON Lines, pcap, pcapng, ASC, BLF or TRC file (passive)
   replay      Transmit a recorded trace (needs --yes on a non-virtual interface)
   send        Transmit classical CAN frames (needs --yes on a non-virtual interface)
   send-fd     Transmit CAN FD frames (needs --yes on a non-virtual interface)
@@ -51,7 +51,7 @@ Available Commands:
   trace       Convert and inspect trace files (candump, JSON Lines, pcap/pcapng, ASC, BLF, TRC)
   up          Bring an interface up (Linux, CAP_NET_ADMIN, needs --yes)
   version     Print the version of canbusctl and go-canbus
-  xl          CAN XL frames on SocketCAN (Linux ≥ 6.2, interface mtu 2060)
+  xl          CAN XL frames on SocketCAN (Linux ≥ 6.2, interface mtu 2060) or the virtual bus
 
 Flags:
       --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
@@ -278,11 +278,13 @@ Global Flags:
 
 ```text
 record writes received frames to --output, in the format of its extension
-(.log/.txt candump, .jsonl lossless JSON Lines, .pcap Wireshark, .asc and
-.blf Vector, .trc PEAK; ASC/BLF/TRC times are local wall-clock times: set TZ)
-or --file-format,
+(.log/.txt candump, .jsonl lossless JSON Lines, .pcap and .pcapng Wireshark,
+.asc and .blf Vector, .trc PEAK; ASC/BLF/TRC times are local wall-clock
+times: set TZ) or --file-format,
 until --count, --duration or Ctrl-C. candump logs keep microseconds; JSON Lines
-keeps every field, including nanosecond timestamps.
+keeps every field, including nanosecond timestamps; pcapng keeps interface
+names. --xl also records CAN XL frames (a SocketCAN interface with the CAN XL
+MTU or the virtual bus; candump, JSON Lines, pcap and pcapng only).
 
 Usage:
   canbusctl record [flags]
@@ -291,12 +293,13 @@ Flags:
   -n, --count int            Stop after this many frames
       --duration duration    Stop after this time
       --errors               Also record error frames
-      --file-format string   candump, jsonl, pcap, asc, blf or trc (default: from the extension)
-      --filter stringArray   Filter <id>:<mask> (repeatable)
+      --file-format string   candump, jsonl, pcap, pcapng, asc, blf or trc (default: from the extension)
+      --filter stringArray   Filter <id>:<mask> (repeatable; selects CAN XL frames by priority)
   -h, --help                 help for record
   -i, --interface string     CAN interface, or "virtual" (required)
       --no-fd                Do not open the socket for CAN FD
   -o, --output string        Output file (required)
+      --xl                   Also record CAN XL frames (SocketCAN with the CAN XL MTU, or virtual)
 
 Global Flags:
       --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
@@ -312,6 +315,8 @@ replay sends the frames of a candump log, JSON Lines, pcap/pcapng, ASC or BLF fi
 stdin) with their recorded timing (--speed 1), scaled (--speed 2 is twice as fast)
 or as fast as allowed (--max-speed). Error frames are never sent. --max-frames,
 --duration and --rate bound the transmission. The trace is streamed, not loaded.
+--xl opens the interface for CAN XL and sends the trace's CAN XL frames too;
+without it they are counted, not sent.
 
 Usage:
   canbusctl replay <trace> [flags]
@@ -326,6 +331,7 @@ Flags:
       --print                Print every frame sent
       --rate float           Transmit at most this many frames per second (0: no limit)
       --speed float          Timing factor: 1 original, 2 twice as fast (default 1)
+      --xl                   Send CAN XL frames too (SocketCAN with the CAN XL MTU, or virtual)
       --yes                  Confirm transmission on a non-virtual interface
 
 Global Flags:
@@ -675,8 +681,9 @@ The trace commands work on files only and never touch an interface.
 
 Readable: candump logs (.log/.txt), JSON Lines (.jsonl), pcap and pcapng,
 Vector ASC (.asc) and BLF (.blf), PEAK TRC (.trc, versions 1.0 to 2.1;
-written as 2.1), detected from the content. Writable: all of them but
-pcapng, chosen by the output's extension or --file-format.
+written as 2.1), detected from the content. Writable: all of them, chosen
+by the output's extension or --file-format. CAN XL frames are kept by
+candump logs, JSON Lines, pcap and pcapng.
 
 ASC, BLF and TRC hold local wall-clock times without a time zone: they are
 read and written in the local zone; set TZ (e.g. TZ=UTC) to match a file
@@ -709,13 +716,15 @@ convert reads <input> ("-": stdin) in any readable format and writes
 only matching frames (candump notation, repeatable, ORed or ANDed with
 --join); --no-errors drops error frames; --max-frames stops early. What the
 target format cannot keep (error class in ASC/BLF, interface names, echo
-marks, sub-microsecond times) is reported, never silently dropped.
+marks, sub-microsecond times, CAN XL frames in ASC/BLF/TRC) is reported,
+never silently dropped. --filter selects CAN XL frames by priority, as the
+kernel's filters do.
 
 Usage:
   canbusctl trace convert <input> <output> [flags]
 
 Flags:
-      --file-format string   candump, jsonl, pcap, asc, blf or trc (default: from the extension)
+      --file-format string   candump, jsonl, pcap, pcapng, asc, blf or trc (default: from the extension)
       --filter stringArray   Keep frames matching <id>:<mask> (repeatable)
   -h, --help                 help for convert
       --join                 A frame must pass all filters
@@ -884,7 +893,9 @@ Global Flags:
 ```text
 CAN XL frames (ISO 11898-1:2024: 11-bit priority, VCID, SEC and RRS flags,
 SDU type, acceptance field, 1..2048 data bytes) on a SocketCAN interface with
-the CAN XL MTU (ip link set vcanxl0 mtu 2060; Linux 6.2 or later, VCIDs 6.9).
+the CAN XL MTU (ip link set vcanxl0 mtu 2060; Linux 6.2 or later, VCIDs 6.9)
+or the in-process virtual bus. record --xl and replay --xl carry CAN XL
+frames too; trace convert keeps them where the target format can.
 Frames use can-utils notation: <vcid><prio>#<flags>:<sdt>:<af>#<data>, for
 example 00242#80:03:00C0FFEE#11223344, or <prio>#... with VCID 0.
 
@@ -922,7 +933,7 @@ Flags:
       --duration duration   Stop transmitting after this time (0: no limit)
       --gap duration        Pause between frames
   -h, --help                help for send
-  -i, --interface string    SocketCAN interface with the CAN XL MTU (required)
+  -i, --interface string    SocketCAN interface with the CAN XL MTU, or "virtual" (required)
       --max-frames int      Transmit at most this many frames (default 10000)
       --rate float          Transmit at most this many frames per second (0: no limit)
       --repeat int          Send the frames this many times (default 1)
@@ -940,8 +951,9 @@ Global Flags:
 ```text
 xl monitor receives every frame of a CAN XL interface, CAN XL and CAN or
 CAN FD alike, and prints them until --count frames, --duration or Ctrl-C. It
-never transmits. --output also writes them to a candump log (.log) or JSON
-Lines (.jsonl) trace, the formats that carry CAN XL.
+never transmits. --output also writes them to a candump log (.log), JSON
+Lines (.jsonl), pcap or pcapng (Wireshark) trace, the formats that carry CAN
+XL.
 
 Usage:
   canbusctl xl monitor [flags]
@@ -950,8 +962,8 @@ Flags:
   -n, --count int           Stop after this many frames (0: no limit)
       --duration duration   Stop after this time (0: until Ctrl-C)
   -h, --help                help for monitor
-  -i, --interface string    SocketCAN interface with the CAN XL MTU (required)
-  -o, --output string       Also write the frames to this trace file (.log or .jsonl)
+  -i, --interface string    SocketCAN interface with the CAN XL MTU, or "virtual" (required)
+  -o, --output string       Also write the frames to this trace file (.log, .jsonl, .pcap or .pcapng)
 
 Global Flags:
       --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")

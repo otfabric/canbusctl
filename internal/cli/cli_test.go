@@ -102,8 +102,8 @@ func TestTraceFormat(t *testing.T) {
 	if _, err := TraceFormat("a", "mf4"); err == nil {
 		t.Fatal("mf4")
 	}
-	if _, err := TraceFormat("a.pcapng", ""); err == nil {
-		t.Fatal("pcapng")
+	if f, err := TraceFormat("a.pcapng", ""); err != nil || f != capture.FormatPCAPNG {
+		t.Fatal(f, err)
 	}
 	lines, _ := ReadLines(strings.NewReader("a\n\n# c\n b \n"))
 	if len(lines) != 2 || lines[1] != "b" {
@@ -161,7 +161,7 @@ func FuzzTraceFormat(f *testing.F) {
 			return
 		}
 		switch format {
-		case capture.FormatCandump, capture.FormatJSONL, capture.FormatPCAP, capture.FormatASC, capture.FormatBLF:
+		case capture.FormatCandump, capture.FormatJSONL, capture.FormatPCAP, capture.FormatPCAPNG, capture.FormatASC, capture.FormatBLF, capture.FormatTRC:
 		default:
 			t.Fatalf("%q/%q: unwritable format %q accepted", path, explicit, format)
 		}

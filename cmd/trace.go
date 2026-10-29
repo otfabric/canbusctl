@@ -27,8 +27,9 @@ func newTraceCmd(a *app) *cobra.Command {
 
 Readable: candump logs (.log/.txt), JSON Lines (.jsonl), pcap and pcapng,
 Vector ASC (.asc) and BLF (.blf), PEAK TRC (.trc, versions 1.0 to 2.1;
-written as 2.1), detected from the content. Writable: all of them but
-pcapng, chosen by the output's extension or --file-format.
+written as 2.1), detected from the content. Writable: all of them, chosen
+by the output's extension or --file-format. CAN XL frames are kept by
+candump logs, JSON Lines, pcap and pcapng.
 
 ASC, BLF and TRC hold local wall-clock times without a time zone: they are
 read and written in the local zone; set TZ (e.g. TZ=UTC) to match a file
@@ -61,7 +62,7 @@ func (r convertResult) Text() string {
 
 // losses tracks what the target format cannot keep.
 type losses struct {
-	errorClass, iface, echo, subMicro int
+	errorClass, iface, echo, subMicro, xl int
 }
 
 func (l *losses) note(f *canbus.Frame, format capture.Format) {
@@ -91,8 +92,27 @@ func (l *losses) note(f *canbus.Frame, format capture.Format) {
 		if f.Interface != "" {
 			l.iface++
 		}
+	case capture.FormatPCAPNG:
+		if f.Echo {
+			l.echo++
+		}
 	default:
 	}
+}
+
+// noteXL records what the target format loses of a CAN XL frame. It
+// reports false when the format cannot hold CAN XL at all.
+func (l *losses) noteXL(x *canbus.XLFrame, format capture.Format) bool {
+	f := canbus.Frame{Interface: x.Interface, Echo: x.Echo, Timestamp: x.Timestamp}
+	switch format {
+	case capture.FormatCandump, capture.FormatPCAP, capture.FormatPCAPNG:
+		l.note(&f, format)
+	case capture.FormatJSONL:
+	default:
+		l.xl++
+		return false
+	}
+	return true
 }
 
 func (l *losses) list() []string {
@@ -106,6 +126,7 @@ func (l *losses) list() []string {
 	add(l.iface, "interface name (ASC/BLF/TRC keep channel numbers, pcap none)")
 	add(l.echo, "own-transmission (echo) mark")
 	add(l.subMicro, "timestamp below microseconds")
+	add(l.xl, "CAN XL, not written (ASC, BLF and TRC cannot carry CAN XL)")
 	return out
 }
 
@@ -125,7 +146,9 @@ func newTraceConvertCmd(a *app) *cobra.Command {
 only matching frames (candump notation, repeatable, ORed or ANDed with
 --join); --no-errors drops error frames; --max-frames stops early. What the
 target format cannot keep (error class in ASC/BLF, interface names, echo
-marks, sub-microsecond times) is reported, never silently dropped.`,
+marks, sub-microsecond times, CAN XL frames in ASC/BLF/TRC) is reported,
+never silently dropped. --filter selects CAN XL frames by priority, as the
+kernel's filters do.`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(_ *cobra.Command, args []string) error {
 			format, err := cli.TraceFormat(args[1], ff)
@@ -156,15 +179,39 @@ marks, sub-microsecond times) is reported, never silently dropped.`,
 			}
 			res := convertResult{Input: args[0], Output: args[1], Format: string(format)}
 			var lost losses
+			xr, _ := r.(capture.XLReader)
+			xw, _ := w.(capture.XLWriter)
+			var x canbus.XLFrame
 			for maxFrames <= 0 || res.Written < maxFrames {
 				var f canbus.Frame
-				if err := r.Read(&f); err != nil {
+				var isXL bool
+				var err error
+				if xr != nil {
+					isXL, err = xr.ReadAny(&f, &x)
+				} else {
+					err = r.Read(&f)
+				}
+				if err != nil {
 					if errors.Is(err, io.EOF) {
 						break
 					}
 					return &errs.Error{Kind: errs.KindInvalidInput, Code: errs.CodeInvalidCapture, Message: fmt.Sprintf("%s: %v", args[0], err), Cause: err}
 				}
 				res.Read++
+				if isXL {
+					if fs != nil && !fs.MatchXL(&x) {
+						res.Filtered++
+						continue
+					}
+					if !lost.noteXL(&x, format) {
+						continue
+					}
+					if err := xw.WriteXL(&x); err != nil {
+						return errs.New(errs.KindOutput, errs.CodeOutputFailed, "write %s: %w", args[1], err)
+					}
+					res.Written++
+					continue
+				}
 				if f.IsError() && noErrors || !f.IsError() && fs != nil && !fs.Match(&f) {
 					res.Filtered++
 					continue
@@ -183,7 +230,7 @@ marks, sub-microsecond times) is reported, never silently dropped.`,
 		},
 	}
 	f := c.Flags()
-	f.StringVar(&ff, "file-format", "", "candump, jsonl, pcap, asc, blf or trc (default: from the extension)")
+	f.StringVar(&ff, "file-format", "", "candump, jsonl, pcap, pcapng, asc, blf or trc (default: from the extension)")
 	f.StringArrayVar(&filters, "filter", nil, "Keep frames matching <id>:<mask> (repeatable)")
 	f.BoolVar(&join, "join", false, "A frame must pass all filters")
 	f.BoolVar(&noErrors, "no-errors", false, "Drop error frames")
@@ -209,6 +256,7 @@ type traceInfo struct {
 	Classical int       `json:"classical"`
 	FD        int       `json:"fd"`
 	Remote    int       `json:"remote"`
+	XL        int       `json:"xl"`
 	Errors    int       `json:"errors"`
 	Extended  int       `json:"extended"`
 	IDs       []traceID `json:"ids"`
@@ -220,7 +268,7 @@ func (r traceInfo) Text() string {
 	if r.First != "" {
 		fmt.Fprintf(&b, " (%s .. %s)", r.First, r.Last)
 	}
-	fmt.Fprintf(&b, "\n  classical %d, CAN FD %d, remote %d, error %d; extended identifiers %d\n", r.Classical, r.FD, r.Remote, r.Errors, r.Extended)
+	fmt.Fprintf(&b, "\n  classical %d, CAN FD %d, CAN XL %d, remote %d, error %d; extended identifiers %d\n", r.Classical, r.FD, r.XL, r.Remote, r.Errors, r.Extended)
 	for _, id := range r.IDs {
 		fmt.Fprintf(&b, "  %-9s %7d frames  %9.2f Hz  len %d..%d\n", id.ID, id.Frames, id.RateHz, id.MinLen, id.MaxLen)
 	}
@@ -280,15 +328,49 @@ func newTraceInfoCmd(a *app) *cobra.Command {
 			res := traceInfo{File: path, Format: string(format)}
 			ids := map[string]*traceID{}
 			var first, last time.Time
+			stamp := func(ts time.Time) {
+				if !ts.IsZero() {
+					if first.IsZero() || ts.Before(first) {
+						first = ts
+					}
+					if ts.After(last) {
+						last = ts
+					}
+				}
+			}
+			count := func(k string, n int) {
+				s := ids[k]
+				if s == nil {
+					s = &traceID{ID: k, MinLen: n, MaxLen: n}
+					ids[k] = s
+				}
+				s.Frames++
+				s.MinLen, s.MaxLen = min(s.MinLen, n), max(s.MaxLen, n)
+			}
+			xr, _ := r.(capture.XLReader)
+			var x canbus.XLFrame
 			for {
 				var f canbus.Frame
-				if err := r.Read(&f); err != nil {
+				var isXL bool
+				var err error
+				if xr != nil {
+					isXL, err = xr.ReadAny(&f, &x)
+				} else {
+					err = r.Read(&f)
+				}
+				if err != nil {
 					if errors.Is(err, io.EOF) {
 						break
 					}
 					return &errs.Error{Kind: errs.KindInvalidInput, Code: errs.CodeInvalidCapture, Message: fmt.Sprintf("%s: %v", path, err), Cause: err}
 				}
 				res.Frames++
+				if isXL {
+					res.XL++
+					stamp(x.Timestamp)
+					count(fmt.Sprintf("XL %02X%03X", x.VCID, x.Priority), len(x.Data))
+					continue
+				}
 				switch {
 				case f.IsError():
 					res.Errors++
@@ -302,22 +384,8 @@ func newTraceInfoCmd(a *app) *cobra.Command {
 				if f.IsExtended() {
 					res.Extended++
 				}
-				if !f.Timestamp.IsZero() {
-					if first.IsZero() || f.Timestamp.Before(first) {
-						first = f.Timestamp
-					}
-					if f.Timestamp.After(last) {
-						last = f.Timestamp
-					}
-				}
-				k := frameKey(&f)
-				s := ids[k]
-				if s == nil {
-					s = &traceID{ID: k, MinLen: int(f.Len), MaxLen: int(f.Len)}
-					ids[k] = s
-				}
-				s.Frames++
-				s.MinLen, s.MaxLen = min(s.MinLen, int(f.Len)), max(s.MaxLen, int(f.Len))
+				stamp(f.Timestamp)
+				count(frameKey(&f), int(f.Len))
 			}
 			if !first.IsZero() {
 				res.First, res.Last = first.Format(time.RFC3339Nano), last.Format(time.RFC3339Nano)

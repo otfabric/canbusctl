@@ -6,6 +6,49 @@ with the version bump). It computes the tag, builds the binaries for linux
 publishes the GitHub release with the section of this file that matches the
 version as its notes. Add the section before running it.
 
+## v0.6.0
+
+**Date:** 2026-10-29
+**Previous release:** v0.5.0
+
+## Summary
+
+CAN XL in recordings, replays and trace conversion, on the virtual bus,
+and pcapng output. Built on go-canbus v0.7.0.
+
+## Additions
+
+- **`record --xl`** records CAN XL frames with CAN and CAN FD frames, in
+  arrival order, to candump logs, JSON Lines, pcap or pcapng (other
+  formats are refused before anything is opened).
+- **`replay --xl`** sends a trace's CAN XL frames too; without it they are
+  counted (`skippedXL`) and reported, not sent. `--print` shows them.
+- **`trace info`** counts CAN XL frames (`xl`; identifiers
+  `XL <vcid><priority>`).
+- **pcapng output** wherever traces are written (`record`, `trace
+  convert`, `monitor -o`, `xl monitor -o`), with interface names.
+- **`xl send` and `xl monitor` on `-i virtual`**; `xl monitor --output`
+  takes .pcap and .pcapng.
+- Filters (`--filter`) select CAN XL frames by priority, as the kernel's
+  filters do.
+
+## Fixes
+
+- **`trace convert` dropped CAN XL frames silently.** Its reader skipped
+  them, against the command's rule that nothing is dropped unreported.
+  CAN XL frames are now kept in candump, JSON Lines, pcap and pcapng and
+  reported as lost for ASC, BLF and TRC.
+
+## Verification
+
+- On vcanxl0 (Linux 7.0 and the CI kernels): `record --xl` to pcapng of
+  CAN XL frames up to 2048 bytes and a CAN frame, `trace info` of the
+  file, and `replay --xl` of it received in order by `xl monitor`.
+- On the virtual bus: record, monitor, replay and convert of mixed CAN,
+  CAN FD and CAN XL traffic, on every OS.
+
+---
+
 ## v0.5.0
 
 **Date:** 2026-10-28

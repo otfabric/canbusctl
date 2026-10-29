@@ -5,6 +5,7 @@ package cmd
 import (
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -15,7 +16,6 @@ import (
 	"github.com/otfabric/canbusctl/internal/errs"
 	"github.com/otfabric/go-canbus"
 	"github.com/otfabric/go-canbus/capture"
-	"github.com/otfabric/go-canbus/socketcan"
 )
 
 // xlJSON is the JSON form of a CAN XL frame.
@@ -58,26 +58,57 @@ func xlLine(x *canbus.XLFrame) string {
 	return ts + " " + iface + " " + x.String()
 }
 
-// openXL opens a SocketCAN socket in CAN XL mode. CAN XL exists only on
-// SocketCAN: not on the virtual bus or slcan adapters.
-func openXL(iface string, recvOwn bool) (*socketcan.Conn, error) {
-	if iface == cli.Virtual || strings.HasPrefix(iface, cli.SlcanPrefix) {
-		return nil, errs.New(errs.KindUnsupported, errs.CodeUnsupported, "%s: CAN XL needs a SocketCAN interface (Linux ≥ 6.2, mtu 2060)", iface)
+// openXL opens an interface in CAN XL mode: a SocketCAN interface with
+// the CAN XL MTU or the virtual bus; slcan adapters carry no CAN XL.
+func openXL(iface string, recvOwn bool) (canbus.XLTransport, error) {
+	if strings.HasPrefix(iface, cli.SlcanPrefix) {
+		return nil, errs.New(errs.KindUnsupported, errs.CodeUnsupported, "%s: CAN XL needs a SocketCAN interface (Linux ≥ 6.2, mtu 2060) or the virtual bus", iface)
 	}
-	opts := []socketcan.Option{socketcan.WithXL()}
-	if recvOwn {
-		opts = append(opts, socketcan.WithRecvOwn())
+	t, err := openTransport(iface, openOpts{xl: true, recvOwn: recvOwn})
+	if err != nil {
+		return nil, err
 	}
-	return socketcan.Open(iface, opts...)
+	x, ok := t.(canbus.XLTransport)
+	if !ok {
+		_ = t.Close()
+		return nil, errs.New(errs.KindUnsupported, errs.CodeUnsupported, "%s: the transport does not carry CAN XL", iface)
+	}
+	return x, nil
+}
+
+// xlFormat returns the trace format of a path (or explicit), or an error
+// when the format cannot hold CAN XL frames.
+func xlFormat(path, explicit string) (capture.Format, error) {
+	format, err := cli.TraceFormat(path, explicit)
+	if err != nil {
+		return "", err
+	}
+	switch format {
+	case capture.FormatCandump, capture.FormatJSONL, capture.FormatPCAP, capture.FormatPCAPNG:
+		return format, nil
+	default:
+	}
+	return "", errs.Invalid("%s: %s cannot hold CAN XL frames (use .log, .jsonl, .pcap or .pcapng)", path, format)
+}
+
+// newXLWriter returns a writer of a format xlFormat accepted.
+func newXLWriter(w io.Writer, format capture.Format) (capture.XLWriter, error) {
+	tw, err := capture.NewWriter(w, format)
+	if err != nil {
+		return nil, err
+	}
+	return tw.(capture.XLWriter), nil
 }
 
 func newXLCmd(a *app) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "xl",
-		Short: "CAN XL frames on SocketCAN (Linux ≥ 6.2, interface mtu 2060)",
+		Short: "CAN XL frames on SocketCAN (Linux ≥ 6.2, interface mtu 2060) or the virtual bus",
 		Long: `CAN XL frames (ISO 11898-1:2024: 11-bit priority, VCID, SEC and RRS flags,
 SDU type, acceptance field, 1..2048 data bytes) on a SocketCAN interface with
-the CAN XL MTU (ip link set vcanxl0 mtu 2060; Linux 6.2 or later, VCIDs 6.9).
+the CAN XL MTU (ip link set vcanxl0 mtu 2060; Linux 6.2 or later, VCIDs 6.9)
+or the in-process virtual bus. record --xl and replay --xl carry CAN XL
+frames too; trace convert keeps them where the target format can.
 Frames use can-utils notation: <vcid><prio>#<flags>:<sdt>:<af>#<data>, for
 example 00242#80:03:00C0FFEE#11223344, or <prio>#... with VCID 0.`,
 	}
@@ -178,7 +209,7 @@ interface that is not vcan or vxcan nothing is sent without --yes.`,
 		},
 	}
 	fl := c.Flags()
-	fl.StringVarP(&iface, "interface", "i", "", "SocketCAN interface with the CAN XL MTU (required)")
+	fl.StringVarP(&iface, "interface", "i", "", "SocketCAN interface with the CAN XL MTU, or \"virtual\" (required)")
 	fl.BoolVar(&yes, "yes", false, "Confirm transmission on a non-virtual interface")
 	fl.IntVar(&repeat, "repeat", 1, "Send the frames this many times")
 	fl.DurationVar(&gap, "gap", 0, "Pause between frames")
@@ -198,29 +229,25 @@ func newXLMonitorCmd(a *app) *cobra.Command {
 		Short: "Print CAN, CAN FD and CAN XL frames as they arrive (passive)",
 		Long: `xl monitor receives every frame of a CAN XL interface, CAN XL and CAN or
 CAN FD alike, and prints them until --count frames, --duration or Ctrl-C. It
-never transmits. --output also writes them to a candump log (.log) or JSON
-Lines (.jsonl) trace, the formats that carry CAN XL.`,
+never transmits. --output also writes them to a candump log (.log), JSON
+Lines (.jsonl), pcap or pcapng (Wireshark) trace, the formats that carry CAN
+XL.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			var tw capture.XLWriter
 			if output != "" {
-				format, err := cli.TraceFormat(output, "")
+				format, err := xlFormat(output, "")
 				if err != nil {
 					return err
-				}
-				if format != capture.FormatCandump && format != capture.FormatJSONL {
-					return errs.Invalid("--output %s: CAN XL is written to candump logs (.log) and JSON Lines (.jsonl) only", output)
 				}
 				file, err := os.Create(output)
 				if err != nil {
 					return errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot create %s: %w", output, err)
 				}
 				defer func() { _ = file.Close() }()
-				w, err := capture.NewWriter(file, format)
-				if err != nil {
+				if tw, err = newXLWriter(file, format); err != nil {
 					return err
 				}
-				tw = w.(capture.XLWriter)
 				defer func() { _ = tw.Close() }()
 			}
 			conn, err := openXL(iface, false)
@@ -277,8 +304,8 @@ Lines (.jsonl) trace, the formats that carry CAN XL.`,
 		},
 	}
 	fl := c.Flags()
-	fl.StringVarP(&iface, "interface", "i", "", "SocketCAN interface with the CAN XL MTU (required)")
-	fl.StringVarP(&output, "output", "o", "", "Also write the frames to this trace file (.log or .jsonl)")
+	fl.StringVarP(&iface, "interface", "i", "", "SocketCAN interface with the CAN XL MTU, or \"virtual\" (required)")
+	fl.StringVarP(&output, "output", "o", "", "Also write the frames to this trace file (.log, .jsonl, .pcap or .pcapng)")
 	fl.IntVarP(&count, "count", "n", 0, "Stop after this many frames (0: no limit)")
 	fl.DurationVar(&duration, "duration", 0, "Stop after this time (0: until Ctrl-C)")
 	_ = c.MarkFlagRequired("interface")
