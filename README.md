@@ -1,7 +1,12 @@
 # canbusctl
 
-[![CI](https://github.com/otfabric/canbusctl/actions/workflows/ci.yml/badge.svg)](https://github.com/otfabric/canbusctl/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/otfabric/canbusctl/branch/main/graph/badge.svg)](https://codecov.io/gh/otfabric/canbusctl)
+[![Go Version](https://img.shields.io/badge/Go-1.23%2B-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI Status](https://github.com/otfabric/canbusctl/actions/workflows/ci.yml/badge.svg)](https://github.com/otfabric/canbusctl/actions/workflows/ci.yml)
+[![Interop](https://github.com/otfabric/canbusctl/actions/workflows/interop.yml/badge.svg)](https://github.com/otfabric/canbusctl/actions/workflows/interop.yml)
+[![Kernels](https://github.com/otfabric/canbusctl/actions/workflows/kernels.yml/badge.svg)](https://github.com/otfabric/canbusctl/actions/workflows/kernels.yml)
+[![Code Coverage](https://codecov.io/gh/otfabric/canbusctl/graph/badge.svg)](https://codecov.io/gh/otfabric/canbusctl)
+[![Latest Release](https://img.shields.io/github/v/release/otfabric/canbusctl?label=release)](https://github.com/otfabric/canbusctl/releases)
 
 A command-line toolkit for CAN, CAN FD, ISO-TP and CAN databases (DBC, KCD,
 ARXML): capture, decode, convert, diagnose, transmit, replay, simulate and
