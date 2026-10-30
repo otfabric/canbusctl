@@ -76,7 +76,7 @@ func TestVCANInterfaces(t *testing.T) {
 	want(t, run(t, "", "info", "lo"), 8, "not a CAN interface")
 	want(t, run(t, "", "stats", "-i", ifc), 0, "rx ")
 	if os.Geteuid() != 0 {
-		want(t, run(t, "", "configure", ifc, "--bitrate", "500000", "--yes"), 7, "CAP_NET_ADMIN")
+		want(t, run(t, "", "configure", ifc, "--bitrate", "500000", "--yes"), 9, "CAP_NET_ADMIN")
 		want(t, run(t, "", "up", ifc, "--yes"), 9)
 	}
 }
