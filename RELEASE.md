@@ -180,6 +180,8 @@ PEAK TRC traces.
   tests against a TCP adapter emulation check the setup commands
   (bit rates, listen-only), `--yes` and software filters.
 
+---
+
 ## v0.2.2
 
 **Date:** 2026-10-28
@@ -197,6 +199,8 @@ canbusctl on go-canbus v0.2.2.
   started process's CAN filters (/proc/net/can) before sending to it, and
   prints the recording when `record` misses frames.
 
+---
+
 ## v0.2.1
 
 **Date:** 2026-10-28
@@ -207,6 +211,8 @@ fires a moment before the command's own deadline as that deadline, and
 `chaos.Bridge.Run` returns nil when its context ends during a send; the
 workarounds canbusctl v0.2.0 carried for both are removed. Commands behave as
 in v0.2.0.
+
+---
 
 ## v0.2.0
 
