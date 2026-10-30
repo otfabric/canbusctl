@@ -6,6 +6,17 @@ with the version bump). It computes the tag, builds the binaries for linux
 publishes the GitHub release with the section of this file that matches the
 version as its notes. Add the section before running it.
 
+## v0.7.1
+
+**Date:** 2026-10-30
+**Previous release:** v0.7.0
+
+### Dependencies
+
+- `go-canbus` → v0.7.1 with `go-serial` v0.2.0: on macOS and BSD the baud constant no longer ends up in `Cflag`, where it set parity and stop-bit flags on the port (slcan).
+
+---
+
 ## v0.7.0
 
 **Date:** 2026-10-30
