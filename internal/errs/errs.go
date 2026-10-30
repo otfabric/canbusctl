@@ -29,6 +29,9 @@ const (
 	KindPermission   Kind = "permission"
 	KindOutput       Kind = "output"
 	KindInternal     Kind = "internal"
+	// KindInterrupted is a command stopped by SIGINT or SIGTERM before it
+	// had a result.
+	KindInterrupted Kind = "interrupted"
 )
 
 // Process exit codes.
@@ -40,10 +43,11 @@ const (
 	ExitTransport    = 4
 	ExitTimeout      = 5
 	ExitProtocol     = 6
-	ExitPermission   = 7
 	ExitUnsupported  = 8
+	ExitPermission   = 9 // also a safety refusal: the organisation table has one code for both
 	ExitSafety       = 9
 	ExitInternal     = 10
+	ExitInterrupted  = 130 // 128 + SIGINT, as a shell reports it
 )
 
 // Stable codes for scripts (the JSON error's "code").
@@ -108,6 +112,8 @@ func ExitCode(k Kind) int {
 		return ExitUnsupported
 	case KindSafety:
 		return ExitSafety
+	case KindInterrupted:
+		return ExitInterrupted
 	default:
 		return ExitInternal
 	}
@@ -123,7 +129,7 @@ func Classify(err error) *Error {
 	mk := func(k Kind, code string) *Error { return &Error{Kind: k, Code: code, Message: err.Error(), Cause: err} }
 	switch {
 	case errors.Is(err, context.Canceled):
-		return mk(KindInternal, CodeCanceled)
+		return mk(KindInterrupted, CodeCanceled)
 	case errors.Is(err, context.DeadlineExceeded), errors.Is(err, canbus.ErrTimeout):
 		return mk(KindTimeout, CodeTimeout)
 	case errors.Is(err, isotp.ErrTimeout):

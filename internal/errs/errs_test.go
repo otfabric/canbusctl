@@ -20,7 +20,7 @@ func TestClassify(t *testing.T) {
 		kind Kind
 		exit int
 	}{
-		{context.Canceled, KindInternal, ExitInternal},
+		{context.Canceled, KindInterrupted, ExitInterrupted},
 		{fmt.Errorf("x: %w", context.DeadlineExceeded), KindTimeout, ExitTimeout},
 		{isotp.ErrTimeout, KindTimeout, ExitTimeout},
 		{isotp.ErrOverflow, KindProtocol, ExitProtocol},

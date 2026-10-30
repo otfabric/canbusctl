@@ -6,6 +6,22 @@ with the version bump). It computes the tag, builds the binaries for linux
 publishes the GitHub release with the section of this file that matches the
 version as its notes. Add the section before running it.
 
+## v0.7.0
+
+**Date:** 2026-10-30
+**Previous release:** v0.6.0
+
+Exit codes converge on the organisation table (ADR-0006). **Scripts that test for these codes must change.**
+
+| Case | Old | New |
+|---|---|---|
+| Missing privilege (`permission`, CAP_NET_ADMIN) | 7 | 9 |
+| Interrupted before a result (`code` `canceled`) | 10 (`internal`) | 130 (`interrupted`) |
+
+All other codes are unchanged. `error-v1.schema.json` adds the kind `interrupted`. Exit 7 is now reserved for a partial result, which canbusctl does not produce today.
+
+`CANBUSCTL_OUTPUT_FORMAT` is now accepted besides `CANBUSCTL_FORMAT`, which is the canonical name and wins when both are set.
+
 ---
 
 ## v0.6.0

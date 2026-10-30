@@ -3,6 +3,12 @@
 All notable changes are listed here; release notes are in
 [RELEASE.md](RELEASE.md).
 
+## v0.7.0 (2026-10-30)
+
+Exit codes follow the organisation table: `permission` is 9 (was 7), an
+interrupted command is 130 (was 10). `CANBUSCTL_OUTPUT_FORMAT` is accepted
+besides `CANBUSCTL_FORMAT`.
+
 ## v0.6.0 (2026-10-29)
 
 CAN XL beyond `xl send`/`xl monitor`: `record --xl` and `replay --xl`

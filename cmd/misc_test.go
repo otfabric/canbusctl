@@ -64,3 +64,16 @@ func TestConfigureValidation(t *testing.T) {
 type canbusFrame = canbus.Frame
 
 func parseForTest(s string) (canbus.Frame, error) { return cli.ParseFrame(s) }
+
+// CANBUSCTL_OUTPUT_FORMAT is accepted; CANBUSCTL_FORMAT is canonical and wins.
+func TestOutputFormatEnv(t *testing.T) {
+	t.Setenv("CANBUSCTL_FORMAT", "")
+	t.Setenv("CANBUSCTL_OUTPUT_FORMAT", "json")
+	if r := run(t, "", "version"); !strings.Contains(r.out, `"schemaVersion"`) {
+		t.Fatalf("OUTPUT_FORMAT ignored: %q", r.out)
+	}
+	t.Setenv("CANBUSCTL_FORMAT", "text")
+	if r := run(t, "", "version"); strings.Contains(r.out, `"schemaVersion"`) {
+		t.Fatalf("FORMAT does not win: %q", r.out)
+	}
+}
