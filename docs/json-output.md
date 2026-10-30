@@ -1,6 +1,6 @@
 # JSON output
 
-`--format json` (or `CANBUSCTL_FORMAT=json`) makes every command machine
+`--format json` (or `CANBUSCTL_FORMAT=json`; `CANBUSCTL_OUTPUT_FORMAT` is accepted too, `_FORMAT` wins) makes every command machine
 readable. Every document carries `"schemaVersion": "1.0"`; the major version
 changes only with an incompatible change. Schemas:
 [schemas/result-v1.schema.json](../schemas/result-v1.schema.json),

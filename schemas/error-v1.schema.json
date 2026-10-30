@@ -12,7 +12,7 @@
       "required": ["kind", "code", "message"],
       "additionalProperties": false,
       "properties": {
-        "kind": {"enum": ["usage", "invalid_input", "transport", "timeout", "protocol", "unsupported", "safety", "permission", "output", "internal"]},
+        "kind": {"enum": ["usage", "invalid_input", "transport", "timeout", "protocol", "unsupported", "safety", "permission", "output", "internal", "interrupted"]},
         "code": {"type": "string"},
         "message": {"type": "string"}
       }
