@@ -63,7 +63,7 @@ jobs:
           CANBUS_REQUIRE_XL: "1"
         run: make test-vcan
       - name: Coverage (minimum 90 %)
-        run: CANBUS_REQUIRE_VCAN=1 CANBUS_REQUIRE_XL=1 make coverage
+        run: CANBUS_REQUIRE_VCAN=1 CANBUS_REQUIRE_XL=1 make coverage coverage-pkg-check
       - name: Upload to Codecov
         if: matrix.arch == 'amd64'
         uses: codecov/codecov-action@v7
