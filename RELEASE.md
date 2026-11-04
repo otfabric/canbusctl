@@ -36,7 +36,10 @@ records (unchanged).
 - `isotp receive` stopped by SIGINT or SIGTERM exits 130 (`canceled`) as docs/exitcodes.md states; it exited 5.
 - `isotp send --size` beyond `--max-size` is refused before allocating (exit 6, as before).
 - A tiny `--rate` (such as `1e-300`) is clamped instead of becoming unlimited on amd64.
-- `trace convert` removes its partial output file when it fails (only a regular file it created; never a link target or device). Frames a format cannot hold (go-canbus `ErrUnrepresentable`, such as pcap before 1970) fail with exit 10 and the reason; BLF channel loss is listed under `losses`.
+- `trace convert` removes its partial output file when it fails (only a regular file it created; never a link target or device). A frame the target format cannot hold (go-canbus `ErrUnrepresentable`, such as pcap before 1970 or a BLF CAN FD channel over 255) exits 3 with the new code `unrepresentable_frame`, the record number and the reason; BLF channel loss is listed under `losses`.
+- **Output paths that are symbolic links are refused** (exit 3, `file_open_failed`) by every command that writes a file; they used to be followed and their target truncated. Unix also opens outputs with O_NOFOLLOW.
+- `replay` reads a whole trace file before the first frame: a malformed record anywhere exits 3 with nothing sent (it exited 10 `internal_unexpected` after sending the frames before it). From standard input a malformed record after frames were sent exits 10 with code `invalid_capture`.
+- go-canbus capture parse errors are classified `invalid_capture` (exit 3) wherever they surface.
 
 ### Tests
 

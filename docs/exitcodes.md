@@ -31,7 +31,8 @@ identifier:
 | `invalid_input` | `usage`, `invalid_input` |
 | `invalid_frame` | `invalid_input` |
 | `invalid_database` | `invalid_input` |
-| `invalid_capture` | `invalid_input` |
+| `invalid_capture` | `invalid_input`; `internal` for `replay` from standard input after frames were sent |
+| `unrepresentable_frame` | `invalid_input`: `trace convert` met a frame the target format cannot hold (such as a pcap before 1970) |
 | `file_open_failed` | `invalid_input` |
 | `interface_unavailable` | `transport` |
 | `io_failed` | `transport` |
@@ -49,4 +50,13 @@ identifier:
 `--count`, `--duration` or Ctrl-C (SIGINT/SIGTERM).
 
 **Transmitting commands** validate everything before the first frame: an
-invocation that exits 2, 3, 8 or 9 has sent nothing.
+invocation that exits 2, 3, 8 or 9 has sent nothing. `replay` reads a whole
+trace file before sending, so a malformed record anywhere in it exits 3.
+From standard input (`-`) it cannot: a malformed record after frames were
+sent exits 10 with code `invalid_capture` and the number of frames sent.
+
+**Output files** (`record -o`, `monitor -o`, `xl monitor -o`, `trace
+convert`, `dbc generate -o`, `dbc convert -o`) are created owner-only
+(0600); an existing file keeps its mode. An output path that is a symbolic
+link is refused with exit 3 (`file_open_failed`): name the target itself.
+`trace convert` removes its partial output when it fails.

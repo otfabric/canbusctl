@@ -403,7 +403,10 @@ func (a *app) writeOut(path string, data []byte) error {
 		}
 		return nil
 	}
-	if err := os.WriteFile(filepath.Clean(path), data, cli.OutputMode); err != nil {
+	if err := cli.WriteOutput(path, data); err != nil {
+		if errors.Is(err, cli.ErrOutputLink) {
+			return errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot create %s: %w", path, err)
+		}
 		return errs.New(errs.KindOutput, errs.CodeOutputFailed, "write %s: %w", path, err)
 	}
 	return nil

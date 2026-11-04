@@ -226,7 +226,7 @@ Flags:
   -h, --help                help for send
       --id string           Identifier in hexadecimal (with --data)
   -i, --interface string    CAN interface, or "virtual" (required)
-      --max-frames int      Transmit at most this many frames (default 10000)
+      --max-frames int      Transmit at most this many frames (0: no limit) (default 10000)
       --rate float          Transmit at most this many frames per second (0: no limit)
       --repeat int          Send the frames this many times (default 1)
       --rtr                 Remote transmission request
@@ -262,7 +262,7 @@ Flags:
   -h, --help                help for send-fd
       --id string           Identifier in hexadecimal (with --data)
   -i, --interface string    CAN interface, or "virtual" (required)
-      --max-frames int      Transmit at most this many frames (default 10000)
+      --max-frames int      Transmit at most this many frames (0: no limit) (default 10000)
       --rate float          Transmit at most this many frames per second (0: no limit)
       --repeat int          Send the frames this many times (default 1)
       --yes                 Confirm transmission on a non-virtual interface
@@ -326,7 +326,7 @@ Flags:
       --filter stringArray   Replay only frames passing <id>:<mask> (repeatable)
   -h, --help                 help for replay
   -i, --interface string     CAN interface, or "virtual" (required)
-      --max-frames int       Transmit at most this many frames (default 10000)
+      --max-frames int       Transmit at most this many frames (0: no limit) (default 10000)
       --max-speed            Ignore the recorded timing
       --print                Print every frame sent
       --rate float           Transmit at most this many frames per second (0: no limit)
@@ -776,7 +776,7 @@ Flags:
       --duration duration        Stop transmitting after this time (0: no limit) (default 10s)
   -h, --help                     help for simulate
   -i, --interface string         CAN interface, or "virtual" (in this process) (default "virtual")
-      --max-frames int           Transmit at most this many frames (default 10000)
+      --max-frames int           Transmit at most this many frames (0: no limit) (default 10000)
       --message strings          Simulate only these messages (repeatable)
       --pattern string           Signal values: counter, random or initial (default "counter")
       --print                    Print every frame (always on for the virtual bus)
@@ -828,7 +828,7 @@ Flags:
   -h, --help                      help for inject
   -i, --interface string          "virtual", a vcan/vxcan interface, or another with --yes (default "virtual")
       --malformed int             Inject this many malformed frames (virtual bus only)
-      --max-frames int            Transmit at most this many frames (default 10000)
+      --max-frames int            Transmit at most this many frames (0: no limit) (default 10000)
       --rate float                Transmit at most this many frames per second (0: no limit)
       --reorder float             Probability a frame is sent after the next one
       --seed int                  Seed of the fault generator (default 1)
@@ -934,7 +934,7 @@ Flags:
       --gap duration        Pause between frames
   -h, --help                help for send
   -i, --interface string    SocketCAN interface with the CAN XL MTU, or "virtual" (required)
-      --max-frames int      Transmit at most this many frames (default 10000)
+      --max-frames int      Transmit at most this many frames (0: no limit) (default 10000)
       --rate float          Transmit at most this many frames per second (0: no limit)
       --repeat int          Send the frames this many times (default 1)
       --yes                 Confirm transmission on a non-virtual interface

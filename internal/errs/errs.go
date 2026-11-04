@@ -11,6 +11,7 @@ import (
 
 	"github.com/otfabric/go-canbus"
 	"github.com/otfabric/go-canbus/candb"
+	"github.com/otfabric/go-canbus/capture"
 	"github.com/otfabric/go-canbus/isotp"
 )
 
@@ -56,6 +57,7 @@ const (
 	CodeInvalidFrame       = "invalid_frame"
 	CodeInvalidDatabase    = "invalid_database"
 	CodeInvalidCapture     = "invalid_capture"
+	CodeUnrepresentable    = "unrepresentable_frame"
 	CodeFileOpen           = "file_open_failed"
 	CodeInterface          = "interface_unavailable"
 	CodeIO                 = "io_failed"
@@ -144,6 +146,10 @@ func Classify(err error) *Error {
 		return mk(KindInvalidInput, CodeInvalidFrame)
 	case errors.Is(err, canbus.ErrInvalidOption):
 		return mk(KindInvalidInput, CodeInvalidInput)
+	case errors.Is(err, capture.ErrUnrepresentable): // a frame the target trace format cannot hold
+		return mk(KindInvalidInput, CodeUnrepresentable)
+	case isParseError(err):
+		return mk(KindInvalidInput, CodeInvalidCapture)
 	case errors.Is(err, candb.ErrLayout): // a database the parser accepted with a signal layout the codec refuses
 		return mk(KindInvalidInput, CodeInvalidDatabase)
 	case errors.Is(err, candb.ErrRange), errors.Is(err, candb.ErrUnknownSignal), errors.Is(err, candb.ErrMissingSignal),
@@ -160,3 +166,8 @@ func Classify(err error) *Error {
 // ErrFindings ends a command whose result was written and reports
 // problems: exit code 1, no error document.
 var ErrFindings = errors.New("findings reported")
+
+func isParseError(err error) bool {
+	_, ok := errors.AsType[*capture.ParseError](err)
+	return ok
+}
