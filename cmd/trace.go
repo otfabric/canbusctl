@@ -50,14 +50,15 @@ type convertResult struct {
 }
 
 func (r convertResult) Text() string {
-	s := fmt.Sprintf("%s → %s (%s): %d frames read, %d written", r.Input, r.Output, r.Format, r.Read, r.Written)
+	var s strings.Builder
+	s.WriteString(fmt.Sprintf("%s → %s (%s): %d frames read, %d written", r.Input, r.Output, r.Format, r.Read, r.Written))
 	if r.Filtered > 0 {
-		s += fmt.Sprintf(", %d filtered out", r.Filtered)
+		s.WriteString(fmt.Sprintf(", %d filtered out", r.Filtered))
 	}
 	for _, l := range r.Losses {
-		s += "\n  lost: " + l
+		s.WriteString("\n  lost: " + l)
 	}
-	return s
+	return s.String()
 }
 
 // losses tracks what the target format cannot keep.

@@ -42,7 +42,7 @@ func rcvLists() int {
 		if err != nil {
 			return -1
 		}
-		for _, line := range strings.Split(string(d), "\n") {
+		for line := range strings.SplitSeq(string(d), "\n") {
 			if f := strings.Fields(line); len(f) >= 6 && strings.HasPrefix(line, "  ") && !strings.HasPrefix(f[0], "(") && f[0] != "device" {
 				n++
 			}

@@ -121,7 +121,7 @@ func jsonDoc(t *testing.T, s string) map[string]any {
 func jsonLines(t *testing.T, s string) []map[string]any {
 	t.Helper()
 	var out []map[string]any
-	for _, l := range strings.Split(strings.TrimSpace(s), "\n") {
+	for l := range strings.SplitSeq(strings.TrimSpace(s), "\n") {
 		if l != "" {
 			out = append(out, jsonDoc(t, l))
 		}

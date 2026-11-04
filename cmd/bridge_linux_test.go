@@ -108,7 +108,7 @@ func TestVCANBridgeFaults(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	const n = 200
-	for i := 0; i < n; i++ {
+	for i := range n {
 		f, _ := canbus.NewStandard(0x3B3, []byte{byte(i)})
 		if err := tx.Send(ctx, &f); err != nil {
 			t.Fatal(err)

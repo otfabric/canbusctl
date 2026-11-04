@@ -16,7 +16,7 @@ func TestSimulate(t *testing.T) {
 	if a.code != 0 || len(ra) != 9 || len(rb) != 9 {
 		t.Fatal(a, b)
 	}
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		if ra[i]["data"] != rb[i]["data"] || ra[i]["idHex"] != rb[i]["idHex"] {
 			t.Fatalf("frame %d differs: %v %v", i, ra[i], rb[i])
 		}

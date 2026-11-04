@@ -49,7 +49,7 @@ func kernelSlcan(t *testing.T) (string, string) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
-	for i := 0; i < 200; i++ {
+	for range 200 {
 		if _, err := os.Stat(b); err == nil {
 			break
 		}

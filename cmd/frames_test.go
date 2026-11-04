@@ -44,7 +44,7 @@ func TestMonitor(t *testing.T) {
 		resetVirtual()
 		vb := sharedVirtual()
 		go func(vb *virtual.Bus) {
-			for i := 0; i < 200; i++ {
+			for range 200 {
 				_ = vb.InjectError(context.Background(), canbus.ErrorInfo{Class: canbus.ErrClassBusOff})
 				time.Sleep(2 * time.Millisecond)
 			}
@@ -62,7 +62,7 @@ func TestMonitor(t *testing.T) {
 		resetVirtual()
 		vb = sharedVirtual()
 		go func(vb *virtual.Bus) {
-			for i := 0; i < 200; i++ {
+			for range 200 {
 				_ = vb.InjectError(context.Background(), canbus.ErrorInfo{Class: canbus.ErrClassBusOff})
 				time.Sleep(2 * time.Millisecond)
 			}

@@ -122,8 +122,7 @@ func ExitCode(k Kind) int {
 // Classify turns any error into a typed one, recognising go-canbus
 // sentinels.
 func Classify(err error) *Error {
-	var e *Error
-	if errors.As(err, &e) {
+	if e, ok := errors.AsType[*Error](err); ok {
 		return e
 	}
 	mk := func(k Kind, code string) *Error { return &Error{Kind: k, Code: code, Message: err.Error(), Cause: err} }
