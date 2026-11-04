@@ -228,7 +228,7 @@ type sendLimits struct {
 
 func addLimitFlags(c *cobra.Command, l *sendLimits, defRate float64) {
 	c.Flags().Float64Var(&l.rate, "rate", defRate, "Transmit at most this many frames per second (0: no limit)")
-	c.Flags().IntVar(&l.maxFrames, "max-frames", 10000, "Transmit at most this many frames")
+	c.Flags().IntVar(&l.maxFrames, "max-frames", 10000, "Transmit at most this many frames (0: no limit)")
 	c.Flags().DurationVar(&l.duration, "duration", 0, "Stop transmitting after this time (0: no limit)")
 	// Checked before RunE: a negative or NaN bound would silently mean
 	// "no limit" (replay already refused negative ones through go-canbus).
@@ -648,6 +648,11 @@ without it they are counted, not sent.`,
 			if err := cli.TransmitCheck(iface, yes, "replay"); err != nil {
 				return err
 			}
+			// A malformed record anywhere in a file refuses the replay
+			// before the first frame (exit 3 sends nothing).
+			if err := cli.CheckTrace(args[0]); err != nil {
+				return err
+			}
 			r, closeTrace, err := cli.OpenTrace(args[0], a.in)
 			if err != nil {
 				return err
@@ -680,6 +685,15 @@ without it they are counted, not sent.`,
 			}
 			stats, err := capture.Replay(cmd.Context(), r, t, opts)
 			if err != nil && !ended(cmd.Context(), err) {
+				if _, bad := errors.AsType[*capture.ParseError](err); bad {
+					// Only from standard input (a file was checked first).
+					kind := errs.KindInvalidInput
+					if stats.Sent > 0 {
+						kind = errs.KindInternal // frames went out: exit 3 would claim nothing was sent
+					}
+					return &errs.Error{Kind: kind, Code: errs.CodeInvalidCapture,
+						Message: fmt.Sprintf("%s: %v (after %d frames sent)", args[0], err, stats.Sent), Cause: err}
+				}
 				return err
 			}
 			res := replayResult{Interface: iface, Input: args[0], Read: stats.Read, Sent: stats.Sent, Filtered: stats.Filtered,

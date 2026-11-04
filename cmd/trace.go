@@ -221,7 +221,7 @@ kernel's filters do.`,
 						continue
 					}
 					if err := xw.WriteXL(&x); err != nil {
-						return errs.New(errs.KindOutput, errs.CodeOutputFailed, "write %s: %w", args[1], err)
+						return writeError(args[1], format, res.Read, err)
 					}
 					res.Written++
 					continue
@@ -232,12 +232,12 @@ kernel's filters do.`,
 				}
 				lost.note(&f, format)
 				if err := w.Write(&f); err != nil {
-					return errs.New(errs.KindOutput, errs.CodeOutputFailed, "write %s: %w", args[1], err)
+					return writeError(args[1], format, res.Read, err)
 				}
 				res.Written++
 			}
 			if err := w.Close(); err != nil {
-				return errs.New(errs.KindOutput, errs.CodeOutputFailed, "write %s: %w", args[1], err)
+				return writeError(args[1], format, res.Read, err)
 			}
 			if err := file.Close(); err != nil {
 				return errs.New(errs.KindOutput, errs.CodeOutputFailed, "write %s: %w", args[1], err)
@@ -419,4 +419,15 @@ func newTraceInfoCmd(a *app) *cobra.Command {
 			return a.emit("trace info", res)
 		},
 	}
+}
+
+// writeError classifies a trace writer's error: a frame the format cannot
+// hold (capture.ErrUnrepresentable) is invalid input (exit 3), anything
+// else an output failure (exit 10).
+func writeError(path string, format capture.Format, record int, err error) error {
+	if errors.Is(err, capture.ErrUnrepresentable) {
+		return &errs.Error{Kind: errs.KindInvalidInput, Code: errs.CodeUnrepresentable,
+			Message: fmt.Sprintf("record %d cannot be written as %s: %v", record, format, err), Cause: err}
+	}
+	return errs.New(errs.KindOutput, errs.CodeOutputFailed, "write %s: %w", path, err)
 }

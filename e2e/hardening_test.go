@@ -49,7 +49,7 @@ func TestHardeningExitCodes(t *testing.T) {
 	}
 	pcap := filepath.Join(dir, "old.pcap")
 	r := run(t, "", "trace", "convert", old, pcap, "--format", "json")
-	want(t, r, 10, `"code": "output_failed"`, "not representable", "1970..2106")
+	want(t, r, 3, `"code": "unrepresentable_frame"`, "1970..2106")
 	if _, err := os.Stat(pcap); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("a failed conversion left %s", pcap)
 	}

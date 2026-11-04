@@ -312,10 +312,24 @@ func FrameLine(f *canbus.Frame) string {
 // carry vehicle data.
 const OutputMode = 0o600
 
+// ErrOutputLink refuses an output path that is a symbolic link: writing
+// through it would truncate whatever file the link points to.
+var ErrOutputLink = errors.New("the output is a symbolic link; canbusctl does not write through links (name the target itself)")
+
 // CreateOutput creates or truncates the file an operator named on the
-// command line, owner-only.
+// command line, owner-only. A symbolic link is refused (ErrOutputLink),
+// also when one appears between the check and the open (O_NOFOLLOW where
+// the platform has it). An existing regular file keeps its mode.
 func CreateOutput(path string) (*os.File, error) {
-	return os.OpenFile(filepath.Clean(path), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, OutputMode)
+	path = filepath.Clean(path)
+	if OutputIsLink(path) {
+		return nil, ErrOutputLink
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC|oNoFollow, OutputMode)
+	if err != nil && OutputIsLink(path) {
+		return nil, ErrOutputLink
+	}
+	return f, err
 }
 
 // SameFile reports that the paths name one existing file (a link to it
@@ -336,4 +350,42 @@ func RemovePartial(path string) {
 	if st, err := os.Lstat(filepath.Clean(path)); err == nil && st.Mode().IsRegular() {
 		_ = os.Remove(filepath.Clean(path))
 	}
+}
+
+// CheckTrace reads a whole trace file and reports its first malformed
+// record (invalid_capture), so that a transmitting command can refuse a
+// bad file before it sends anything. Standard input ("-") cannot be read
+// twice and is not checked.
+func CheckTrace(path string) error {
+	if path == "-" {
+		return nil
+	}
+	r, closer, err := OpenTrace(path, nil)
+	if err != nil {
+		return err
+	}
+	defer closer()
+	xr, _ := r.(capture.XLReader)
+	var f canbus.Frame
+	var x canbus.XLFrame
+	for n := 1; ; n++ {
+		if xr != nil {
+			_, err = xr.ReadAny(&f, &x)
+		} else {
+			err = r.Read(&f)
+		}
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return &errs.Error{Kind: errs.KindInvalidInput, Code: errs.CodeInvalidCapture,
+				Message: fmt.Sprintf("%s: %v (nothing sent)", path, err), Cause: err}
+		}
+	}
+}
+
+// OutputIsLink reports that path exists as a symbolic link.
+func OutputIsLink(path string) bool {
+	st, err := os.Lstat(filepath.Clean(path))
+	return err == nil && st.Mode()&os.ModeSymlink != 0
 }

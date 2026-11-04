@@ -3,7 +3,6 @@
 package cmd
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -48,15 +47,16 @@ func ascFrom(t *testing.T, year string) string {
 
 // TestTraceConvertUnrepresentable: go-canbus v0.8.0 refuses to write a
 // frame its format cannot hold (it wrapped before). trace convert reports
-// it (exit 10, output_failed, the reason) and leaves no truncated file
-// behind, also where an older output existed.
+// it as invalid input (exit 3, unrepresentable_frame, the record and the
+// reason) and leaves no truncated file behind, also where an older output
+// existed.
 func TestTraceConvertUnrepresentable(t *testing.T) {
 	old := ascFrom(t, "1960")
 	dir := t.TempDir()
 	for ext, reason := range map[string]string{".pcap": "outside 1970..2106", ".pcapng": "outside 1970..2554", ".log": "outside 1970..9999", ".jsonl": "outside 1970..9999"} {
 		out := filepath.Join(dir, "o"+ext)
 		r := run(t, "", "trace", "convert", old, out, "--format", "json")
-		want(t, r, 10, `"code": "output_failed"`, "not representable", reason)
+		want(t, r, 3, `"code": "unrepresentable_frame"`, "record 1", reason)
 		noFile(t, out)
 	}
 	// BLF holds 1601..30827: the 1960 trace converts.
@@ -64,14 +64,14 @@ func TestTraceConvertUnrepresentable(t *testing.T) {
 	// A previous output of the same name is not left half-overwritten.
 	prev := filepath.Join(dir, "prev.pcap")
 	want(t, run(t, "", "trace", "convert", "testdata/trace.log", prev), 0)
-	want(t, run(t, "", "trace", "convert", old, prev), 10, "1970..2106")
+	want(t, run(t, "", "trace", "convert", old, prev), 3, "1970..2106")
 	noFile(t, prev)
 
 	// A CAN FD frame on channel 300: BLF's CAN_FD_MESSAGE_64 has an 8-bit
 	// channel.
 	fd := writeFile(t, "fd.log", "(1700000000.000000) 300 123##1"+strings.Repeat("00", 64)+"\n")
 	r := run(t, "", "trace", "convert", fd, filepath.Join(dir, "fd.blf"))
-	want(t, r, 10, "BLF CAN FD channel 300")
+	want(t, r, 3, "BLF CAN FD channel 300")
 	noFile(t, filepath.Join(dir, "fd.blf"))
 	// Classical frames have 16 bits; a channel beyond them becomes 1, which
 	// is reported as a loss.
@@ -114,11 +114,10 @@ func TestTraceConvertSameFile(t *testing.T) {
 	}
 }
 
-// TestTraceConvertPathsDocumented pins what happens with output paths
-// (documented, not changed): ".." is resolved as given; a symbolic link
-// to an existing file is followed and the target truncated and written,
-// keeping its mode; "-" is a file named "-", not stdout.
-func TestTraceConvertPathsDocumented(t *testing.T) {
+// TestOutputPaths: ".." is resolved as given; an output path that is a
+// symbolic link is refused (exit 3, file_open_failed) by every command
+// that writes a file, and neither the link nor its target is touched.
+func TestOutputPaths(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.Mkdir(filepath.Join(dir, "a"), 0o700); err != nil {
 		t.Fatal(err)
@@ -131,26 +130,36 @@ func TestTraceConvertPathsDocumented(t *testing.T) {
 	if err := os.WriteFile(target, []byte("old"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(target, filepath.Join(dir, "link.log")); err != nil {
+	link := filepath.Join(dir, "link.log")
+	if err := os.Symlink(target, link); err != nil {
 		t.Skip("no symbolic links:", err)
 	}
-	want(t, run(t, "", "trace", "convert", "testdata/trace.log", filepath.Join(dir, "link.log")), 0, "4 written")
-	st, _ := os.Lstat(filepath.Join(dir, "link.log"))
-	tst, _ := os.Stat(target)
-	keptMode := runtime.GOOS == "windows" || tst.Mode().Perm() == 0o644 // Windows has no POSIX modes
-	if st.Mode()&os.ModeSymlink == 0 || tst.Size() < 50 || !keptMode {
-		t.Fatalf("link %v, target %v %o", st.Mode(), tst.Size(), tst.Mode().Perm())
+	dangling := filepath.Join(dir, "dangling.log")
+	if err := os.Symlink(filepath.Join(dir, "nowhere.log"), dangling); err != nil {
+		t.Fatal(err)
 	}
-	// A failed conversion through the link removes neither the link nor
-	// its target (only a regular output file is removed).
-	want(t, run(t, "", "trace", "convert", ascFrom(t, "1960"), filepath.Join(dir, "link.log")), 10)
-	if _, err := os.Stat(target); err != nil {
-		t.Fatal("target removed")
+	for _, out := range []string{link, dangling} {
+		for _, args := range [][]string{
+			{"trace", "convert", "testdata/trace.log", out},
+			{"trace", "convert", ascFrom(t, "1960"), out},
+			{"dbc", "generate", "testdata/vehicle.dbc", "-o", out},
+			{"dbc", "convert", "testdata/vehicle.dbc", "--to", "dbc", "-o", out},
+			{"record", "-i", "virtual", "--duration", "10ms", "-o", out},
+		} {
+			want(t, run(t, "", append(args, "--format", "json")...), 3, `"code": "file_open_failed"`, "symbolic link")
+		}
 	}
-	// dbc generate -o through a link writes the target too.
-	want(t, run(t, "", "dbc", "generate", "testdata/vehicle.dbc", "-o", filepath.Join(dir, "link.log")), 0)
-	if b, _ := os.ReadFile(target); !bytes.Contains(b, []byte("package vehicle")) {
-		t.Fatal("generate did not write through the link")
+	st, _ := os.Lstat(link)
+	if b, _ := os.ReadFile(target); st.Mode()&os.ModeSymlink == 0 || string(b) != "old" {
+		t.Fatalf("link %v, target %q", st.Mode(), b)
+	}
+	if _, err := os.Lstat(filepath.Join(dir, "nowhere.log")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("a dangling link's target was created")
+	}
+	// The target itself, named directly, is written and keeps its mode.
+	want(t, run(t, "", "trace", "convert", "testdata/trace.log", target), 0, "4 written")
+	if tst, _ := os.Stat(target); tst.Size() < 50 || runtime.GOOS != "windows" && tst.Mode().Perm() != 0o644 {
+		t.Fatalf("target %v %o", tst.Size(), tst.Mode().Perm())
 	}
 }
 
@@ -241,13 +250,19 @@ func TestHostileStdin(t *testing.T) {
 	}
 }
 
-// TestReplayMalformedTrace documents (does not change) that replay
-// reports a record that does not parse, found while streaming, as exit
-// 10 internal_unexpected: frames before it may have been sent, so exit
-// 3 ("nothing was transmitted") would not hold either.
+// TestReplayMalformedTrace: replay reads a whole file before its first
+// frame, so a malformed record anywhere exits 3 with nothing sent. From
+// standard input it cannot: a bad record after frames were sent exits 10
+// (invalid_capture, with the count sent), one before any exits 3.
 func TestReplayMalformedTrace(t *testing.T) {
-	bad := writeFile(t, "bad.log", "(1700000000.000000) can0 100#11\n(1700000000.000001) can0 garbage\n")
-	want(t, run(t, "", "replay", "-i", "virtual", "--max-speed", bad, "--format", "json"), 10, "internal_unexpected", "record 2")
+	bad := "(1700000000.000000) can0 100#11\n(1700000000.000001) can0 garbage\n"
+	file := writeFile(t, "bad.log", bad)
+	r := run(t, "", "replay", "-i", "virtual", "--max-speed", file, "--format", "json")
+	want(t, r, 3, `"code": "invalid_capture"`, "record 2", "nothing sent")
+	r = run(t, bad, "replay", "-i", "virtual", "--max-speed", "-", "--format", "json")
+	want(t, r, 10, `"code": "invalid_capture"`, "record 2", "after 1 frames sent")
+	r = run(t, "garbage\n", "replay", "-i", "virtual", "--max-speed", "-", "--format", "json")
+	want(t, r, 3, `"code": "invalid_capture"`)
 }
 
 // TestTransmitBounds: the bounds of transmitting commands are enforced
