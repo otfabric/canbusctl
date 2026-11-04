@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"time"
 
@@ -240,7 +239,7 @@ XL.`,
 				if err != nil {
 					return err
 				}
-				file, err := os.Create(output)
+				file, err := cli.CreateOutput(output)
 				if err != nil {
 					return errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot create %s: %w", output, err)
 				}

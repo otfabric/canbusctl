@@ -401,7 +401,7 @@ func (a *app) writeOut(path string, data []byte) error {
 		}
 		return nil
 	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Clean(path), data, cli.OutputMode); err != nil {
 		return errs.New(errs.KindOutput, errs.CodeOutputFailed, "write %s: %w", path, err)
 	}
 	return nil

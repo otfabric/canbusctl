@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -165,7 +164,7 @@ or ",data"; several filters are ORed, or ANDed with --join.`,
 				if err != nil {
 					return err
 				}
-				file, err := os.Create(output)
+				file, err := cli.CreateOutput(output)
 				if err != nil {
 					return errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot create %s: %w", output, err)
 				}
@@ -321,6 +320,12 @@ without --yes.`,
 				var f canbus.Frame
 				switch {
 				case rtr:
+					if dlc < 0 {
+						return errs.Invalid("--dlc %d: a remote frame requests 0 to 8 bytes", dlc)
+					}
+					if dlc > 8 {
+						return errs.Invalid("--dlc %d: a remote frame requests 0 to 8 bytes", dlc)
+					}
 					f, err = canbus.NewRemote(cid, extended, uint8(dlc))
 				case fd:
 					f, err = canbus.NewFD(cid, extended, brs, payload)
@@ -516,7 +521,7 @@ MTU or the virtual bus; candump, JSON Lines, pcap and pcapng only).`,
 			if err != nil {
 				return err
 			}
-			file, err := os.Create(out)
+			file, err := cli.CreateOutput(out)
 			if err != nil {
 				return errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot create %s: %w", out, err)
 			}

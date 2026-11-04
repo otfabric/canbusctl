@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -169,7 +170,7 @@ kernel's filters do.`,
 				return err
 			}
 			defer closer()
-			file, err := os.Create(args[1])
+			file, err := cli.CreateOutput(args[1])
 			if err != nil {
 				return errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot create %s: %w", args[1], err)
 			}
@@ -308,7 +309,7 @@ func newTraceInfoCmd(a *app) *cobra.Command {
 			path := args[0]
 			var src *os.File
 			if path != "-" {
-				f, err := os.Open(path)
+				f, err := os.Open(filepath.Clean(path))
 				if err != nil {
 					return errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot open trace: %w", err)
 				}
