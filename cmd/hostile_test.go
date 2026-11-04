@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -136,7 +137,8 @@ func TestTraceConvertPathsDocumented(t *testing.T) {
 	want(t, run(t, "", "trace", "convert", "testdata/trace.log", filepath.Join(dir, "link.log")), 0, "4 written")
 	st, _ := os.Lstat(filepath.Join(dir, "link.log"))
 	tst, _ := os.Stat(target)
-	if st.Mode()&os.ModeSymlink == 0 || tst.Size() < 50 || tst.Mode().Perm() != 0o644 {
+	keptMode := runtime.GOOS == "windows" || tst.Mode().Perm() == 0o644 // Windows has no POSIX modes
+	if st.Mode()&os.ModeSymlink == 0 || tst.Size() < 50 || !keptMode {
 		t.Fatalf("link %v, target %v %o", st.Mode(), tst.Size(), tst.Mode().Perm())
 	}
 	// A failed conversion through the link removes neither the link nor
