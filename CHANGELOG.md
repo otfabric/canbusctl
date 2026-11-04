@@ -3,6 +3,15 @@
 All notable changes are listed here; release notes are in
 [RELEASE.md](RELEASE.md).
 
+## v0.8.0 (2026-11-04)
+
+go-canbus v0.8.0, Go 1.26 minimum. Output files are created 0600.
+Invalid bounds and options that were wrapped or treated as "no limit"
+exit 3 (`--dlc`, negative/NaN `--rate`/`--max-frames`/`--duration`,
+`--repeat` overflow, `inject --malformed`, NaN fault probabilities);
+`trace convert` removes partial output and refuses to overwrite its
+input; an interrupted `isotp receive` exits 130 as documented.
+
 ## v0.7.0 (2026-10-30)
 
 Exit codes follow the organisation table: `permission` is 9 (was 7), an
