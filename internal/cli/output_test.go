@@ -7,8 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/otfabric/canbusctl/internal/errs"
+	"github.com/otfabric/go-canbus"
+	"github.com/otfabric/go-canbus/capture"
 )
 
 func TestCreateOutputRefusesLinks(t *testing.T) {
@@ -58,5 +61,47 @@ func TestCheckTrace(t *testing.T) {
 	}
 	if e := errs.Classify(CheckTrace(filepath.Join(dir, "missing"))); e.Code != errs.CodeFileOpen {
 		t.Errorf("missing: %s", e.Code)
+	}
+}
+
+// TestCheckTraceNonXLReader: formats without CAN XL (ASC) are checked
+// through Read.
+func TestCheckTraceNonXLReader(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "t.asc")
+	f, err := os.Create(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, err := capture.NewWriter(f, capture.FormatASC)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fr := canbus.Frame{ID: 0x123, Len: 1, Timestamp: time.Unix(1700000000, 0)}
+	if err := w.Write(&fr); err != nil {
+		t.Fatal(err)
+	}
+	_ = w.Close()
+	_ = f.Close()
+	if err := CheckTrace(p); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestWriteOutput(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "o")
+	if err := WriteOutput(p, []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	if b, _ := os.ReadFile(p); string(b) != "x" {
+		t.Fatalf("%q", b)
+	}
+	if err := WriteOutput(filepath.Join(dir, "no", "o"), nil); err == nil {
+		t.Error("missing directory accepted")
+	}
+	if _, err := os.Stat("/dev/full"); err == nil {
+		if err := WriteOutput("/dev/full", []byte("x")); err == nil {
+			t.Error("write to /dev/full succeeded")
+		}
 	}
 }

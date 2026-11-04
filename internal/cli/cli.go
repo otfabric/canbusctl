@@ -317,19 +317,26 @@ const OutputMode = 0o600
 var ErrOutputLink = errors.New("the output is a symbolic link; canbusctl does not write through links (name the target itself)")
 
 // CreateOutput creates or truncates the file an operator named on the
-// command line, owner-only. A symbolic link is refused (ErrOutputLink),
-// also when one appears between the check and the open (O_NOFOLLOW where
-// the platform has it). An existing regular file keeps its mode.
+// command line, owner-only. A symbolic link is refused (ErrOutputLink);
+// one that appears between the check and the open fails the open
+// (O_NOFOLLOW, where the platform has it). An existing regular file keeps
+// its mode.
 func CreateOutput(path string) (*os.File, error) {
 	path = filepath.Clean(path)
 	if OutputIsLink(path) {
 		return nil, ErrOutputLink
 	}
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC|oNoFollow, OutputMode)
-	if err != nil && OutputIsLink(path) {
-		return nil, ErrOutputLink
+	return os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC|oNoFollow, OutputMode)
+}
+
+// WriteOutput writes data to a file created by CreateOutput.
+func WriteOutput(path string, data []byte) error {
+	f, err := CreateOutput(path)
+	if err != nil {
+		return err
 	}
-	return f, err
+	_, werr := f.Write(data)
+	return errors.Join(werr, f.Close())
 }
 
 // SameFile reports that the paths name one existing file (a link to it

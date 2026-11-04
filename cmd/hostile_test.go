@@ -360,3 +360,20 @@ func TestGeneratePackageName(t *testing.T) {
 func TestDecodeLongStdinLine(t *testing.T) {
 	want(t, run(t, strings.Repeat("A", 70000)+"\n", "dbc", "decode", "testdata/vehicle.dbc", "--format", "json"), 3, `"code": "invalid_input"`, "token too long")
 }
+
+// TestTraceConvertWriteErrors: a CAN XL frame the target cannot hold
+// exits 3 (unrepresentable_frame); a device that refuses the data (Linux
+// /dev/full) is an output failure, exit 10.
+func TestTraceConvertWriteErrors(t *testing.T) {
+	xl := writeFile(t, "xl.log", "(5000000000.000000) vcan0 123#80:00:00000000#00\n")
+	out := filepath.Join(t.TempDir(), "xl.pcap")
+	want(t, run(t, "", "trace", "convert", xl, out, "--format", "json"), 3, `"code": "unrepresentable_frame"`, "1970..2106")
+	noFile(t, out)
+	if _, err := os.Stat("/dev/full"); err != nil {
+		t.Skip("no /dev/full")
+	}
+	for _, ff := range []string{"candump", "pcap", "blf"} {
+		want(t, run(t, "", "trace", "convert", "testdata/trace.log", "/dev/full", "--file-format", ff, "--format", "json"), 10, `"code": "output_failed"`)
+	}
+	want(t, run(t, "", "dbc", "generate", "testdata/vehicle.dbc", "-o", "/dev/full", "--format", "json"), 10, `"code": "output_failed"`)
+}
