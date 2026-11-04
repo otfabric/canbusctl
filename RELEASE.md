@@ -6,6 +6,48 @@ with the version bump). It computes the tag, builds the binaries for linux
 publishes the GitHub release with the section of this file that matches the
 version as its notes. Add the section before running it.
 
+## v0.8.0
+
+**Date:** 2026-11-04
+**Previous release:** v0.7.2
+
+## Summary
+
+Built on go-canbus v0.8.0 (SAST hardening). SAST review of canbusctl at
+severity and confidence low: 10 findings, 9 fixed in code, 1 recorded as
+a false positive (the seeded generator of `simulate --pattern random`).
+New fuzz, hostile-input, chaos and signal tests found 14 more defects,
+fixed here. Go 1.26 is the minimum. Interoperability against
+canbus-interop v0.6.0: 88 passed, 0 failed, 6 skipped, 76 known-difference
+records (unchanged).
+
+### Changed
+
+- **Go 1.26 is the minimum** (was 1.23); CI tests 1.26 and 1.27.
+- **Files canbusctl creates are owner-only (0600)**: `record -o`, `monitor -o`, `xl monitor -o`, `trace convert`, `dbc generate`/`convert` output. Existing files keep their mode.
+- **Exit 3 instead of a silent default or a wrap:**
+  - `send --rtr --dlc` outside 0..8 (`--dlc 260` sent DLC 4).
+  - negative, NaN or infinite `--rate`, `--max-frames`, `--duration` (they meant "no limit"); a `--repeat` whose total overflows (it bypassed `--max-frames`).
+  - `inject --malformed` beyond 65536 or beyond `--max-frames`; NaN fault probabilities in `inject` and `bridge`.
+  - `inject --trace` with a malformed record (it injected part of the trace and exited 0).
+  - `trace convert` onto its own input (it truncated the input).
+  - `dbc generate --package` with a Go keyword; a DBC named after one now gets `<name>db`.
+  - a database layout go-canbus rejects (`candb.ErrLayout`, was exit 10 `internal_unexpected`); `dbc decode` stdin lines over 64 KiB (was exit 10).
+- `isotp receive` stopped by SIGINT or SIGTERM exits 130 (`canceled`) as docs/exitcodes.md states; it exited 5.
+- `isotp send --size` beyond `--max-size` is refused before allocating (exit 6, as before).
+- A tiny `--rate` (such as `1e-300`) is clamped instead of becoming unlimited on amd64.
+- `trace convert` removes its partial output file when it fails (only a regular file it created; never a link target or device). Frames a format cannot hold (go-canbus `ErrUnrepresentable`, such as pcap before 1970) fail with exit 10 and the reason; BLF channel loss is listed under `losses`.
+
+### Tests
+
+13 new fuzz targets (frame, ID, hex, XL notation, fault specs, send limits, slcan flags, package names, and every read-only command run on fuzzed files), chaos seed sweeps of `bridge` and `inject` (virtual bus and vcan, with leak checks), hostile databases and traces, `--yes` checked for every transmitting command, SIGINT/SIGTERM end to end.
+
+### Dependencies
+
+- go-canbus v0.8.0; canbus-interop v0.6.0 images (by digest); shared workflows v3.3.1.
+
+---
+
 ## v0.7.2
 
 **Date:** 2026-10-31

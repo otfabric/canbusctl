@@ -60,7 +60,7 @@ func TestVCANPipeline(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "src.log")
 	var lines []string
-	for i := 0; i < 30; i++ {
+	for i := range 30 {
 		lines = append(lines, fmt.Sprintf("(1700000000.%06d) can0 100#%02X12142000000000", i*1000, i),
 			fmt.Sprintf("(1700000000.%06d) can0 18FEF1FE#01D0%02X0000000000", i*1000+500, i))
 	}
@@ -86,7 +86,7 @@ func TestVCANPipeline(t *testing.T) {
 		r := mon.wait(t, 40*time.Second)
 		want(t, r, 0)
 		var got []string
-		for _, l := range strings.Split(strings.TrimSpace(r.out), "\n") {
+		for l := range strings.SplitSeq(strings.TrimSpace(r.out), "\n") {
 			var m map[string]json.RawMessage
 			_ = json.Unmarshal([]byte(l), &m)
 			if string(m["type"]) == `"frame"` {
@@ -170,7 +170,7 @@ func TestChaosISOTPThroughBridge(t *testing.T) {
 					t.Fatalf("ISO-TP endpoints took %v", el)
 				}
 				delivered := 0
-				for _, l := range strings.Split(strings.TrimSpace(r.out), "\n") {
+				for l := range strings.SplitSeq(strings.TrimSpace(r.out), "\n") {
 					var m map[string]any
 					if json.Unmarshal([]byte(l), &m) != nil || m["type"] != "message" {
 						continue
@@ -294,7 +294,7 @@ func canRcvLists() int {
 		if err != nil {
 			return -1
 		}
-		for _, line := range strings.Split(string(d), "\n") {
+		for line := range strings.SplitSeq(string(d), "\n") {
 			if f := strings.Fields(line); len(f) >= 6 && strings.HasPrefix(line, "  ") && !strings.HasPrefix(f[0], "(") && f[0] != "device" {
 				n++
 			}

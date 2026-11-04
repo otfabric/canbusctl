@@ -86,7 +86,7 @@ func decodeSignals(t *testing.T, db, trace string) []string {
 		t.Fatalf("decode %s: exit %d: %s", trace, r.code, r.err)
 	}
 	var out []string
-	for _, line := range strings.Split(strings.TrimSpace(r.out), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(r.out), "\n") {
 		var m map[string]json.RawMessage
 		if err := json.Unmarshal([]byte(line), &m); err != nil {
 			t.Fatalf("%q: %v", line, err)
@@ -107,7 +107,7 @@ func TestTraceChain(t *testing.T) {
 	r := run(t, "", "simulate", "--dbc", vehicle, "--max-frames", "40", "--format", "json", "--duration", "5s")
 	want(t, r, 0)
 	var lines []string
-	for _, l := range strings.Split(strings.TrimSpace(r.out), "\n") {
+	for l := range strings.SplitSeq(strings.TrimSpace(r.out), "\n") {
 		var m map[string]any
 		if json.Unmarshal([]byte(l), &m) == nil && m["type"] == "frame" {
 			lines = append(lines, fmt.Sprintf("(1700000000.%06d) can0 %s#%s", len(lines)*1000, m["idHex"], strings.ToUpper(m["data"].(string))))

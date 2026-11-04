@@ -28,7 +28,7 @@ func (g *generator) raw(s *candb.Signal) uint64 {
 	switch g.pattern {
 	case "initial":
 		if s.Initial != nil {
-			return bits.Truncate(uint64(*s.Initial), s.Length)
+			return bits.Truncate(twosComplement(*s.Initial), s.Length)
 		}
 		return 0
 	case "random":
@@ -249,4 +249,10 @@ func contains(list []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// twosComplement reinterprets v as its 64-bit two's complement bit
+// pattern (a negative initial value of a signed signal).
+func twosComplement(v int64) uint64 {
+	return uint64(v&math.MaxInt64) | uint64(v>>63&1)<<63
 }

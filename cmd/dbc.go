@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"go/token"
 	"io"
 	"os"
 	"path/filepath"
@@ -323,7 +324,8 @@ func frameSource(a *app, args []string, trace string) (func() (canbus.Frame, err
 	if len(lines) == 0 {
 		var err error
 		if lines, err = cli.ReadLines(a.in); err != nil {
-			return nil, nil, err
+			// A line beyond 64 KiB (bufio.ErrTooLong) is bad input, not an internal error.
+			return nil, nil, errs.New(errs.KindInvalidInput, errs.CodeInvalidInput, "read frames from stdin: %w", err)
 		}
 	}
 	i := 0
@@ -401,7 +403,7 @@ func (a *app) writeOut(path string, data []byte) error {
 		}
 		return nil
 	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Clean(path), data, cli.OutputMode); err != nil {
 		return errs.New(errs.KindOutput, errs.CodeOutputFailed, "write %s: %w", path, err)
 	}
 	return nil
@@ -431,6 +433,11 @@ descriptor instead.`,
 			sum := sha256.Sum256(src)
 			if pkg == "" {
 				pkg = goPackageName(args[0])
+			}
+			if token.IsKeyword(pkg) {
+				// codegen checks identifiers, not keywords: it reported a
+				// "generator bug" with the whole source.
+				return errs.Invalid("invalid package name %q: a Go keyword", pkg)
 			}
 			opts := codegen.Options{Package: pkg, Source: filepath.Base(args[0]), SourceSHA256: hex.EncodeToString(sum[:])}
 			var code []byte
@@ -462,6 +469,9 @@ func goPackageName(path string) string {
 	}
 	if b.Len() == 0 {
 		return "candb"
+	}
+	if token.IsKeyword(b.String()) { // func.dbc: "package func" does not compile
+		return b.String() + "db"
 	}
 	return b.String()
 }

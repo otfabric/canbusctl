@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -50,14 +52,15 @@ type convertResult struct {
 }
 
 func (r convertResult) Text() string {
-	s := fmt.Sprintf("%s → %s (%s): %d frames read, %d written", r.Input, r.Output, r.Format, r.Read, r.Written)
+	var s strings.Builder
+	fmt.Fprintf(&s, "%s → %s (%s): %d frames read, %d written", r.Input, r.Output, r.Format, r.Read, r.Written)
 	if r.Filtered > 0 {
-		s += fmt.Sprintf(", %d filtered out", r.Filtered)
+		fmt.Fprintf(&s, ", %d filtered out", r.Filtered)
 	}
 	for _, l := range r.Losses {
-		s += "\n  lost: " + l
+		s.WriteString("\n  lost: " + l)
 	}
-	return s
+	return s.String()
 }
 
 // losses tracks what the target format cannot keep.
@@ -75,8 +78,10 @@ func (l *losses) note(f *canbus.Frame, format capture.Format) {
 				l.errorClass++
 			}
 		}
-		if _, err := strconv.Atoi(f.Interface); f.Interface != "" && err != nil {
+		if n, err := strconv.Atoi(f.Interface); f.Interface != "" && err != nil {
 			l.iface++
+		} else if format == capture.FormatBLF && f.Interface != "" && (n < 1 || n > math.MaxUint16) {
+			l.iface++ // go-canbus writes channel 1 for a number its 16-bit field cannot hold
 		}
 	case capture.FormatCandump:
 		if f.Echo {
@@ -168,11 +173,20 @@ kernel's filters do.`,
 				return err
 			}
 			defer closer()
-			file, err := os.Create(args[1])
+			if args[0] != "-" && cli.SameFile(args[0], args[1]) {
+				return errs.Invalid("%s and %s are the same file: converting in place would truncate the input", args[0], args[1])
+			}
+			file, err := cli.CreateOutput(args[1])
 			if err != nil {
 				return errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot create %s: %w", args[1], err)
 			}
-			defer func() { _ = file.Close() }()
+			complete := false
+			defer func() {
+				_ = file.Close()
+				if !complete { // a frame the format cannot hold, a bad record: no half-written trace
+					cli.RemovePartial(args[1])
+				}
+			}()
 			w, err := capture.NewWriter(file, format)
 			if err != nil {
 				return err
@@ -225,6 +239,10 @@ kernel's filters do.`,
 			if err := w.Close(); err != nil {
 				return errs.New(errs.KindOutput, errs.CodeOutputFailed, "write %s: %w", args[1], err)
 			}
+			if err := file.Close(); err != nil {
+				return errs.New(errs.KindOutput, errs.CodeOutputFailed, "write %s: %w", args[1], err)
+			}
+			complete = true
 			res.Losses = lost.list()
 			return a.emit("trace convert", res)
 		},
@@ -307,7 +325,7 @@ func newTraceInfoCmd(a *app) *cobra.Command {
 			path := args[0]
 			var src *os.File
 			if path != "-" {
-				f, err := os.Open(path)
+				f, err := os.Open(filepath.Clean(path))
 				if err != nil {
 					return errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot open trace: %w", err)
 				}

@@ -128,7 +128,7 @@ func ParseAssignments(pairs []string, raw bool) (map[string]candb.Input, error) 
 // LoadDatabase reads a DBC or KCD file (by extension, or by content
 // starting with '<'). Diagnostics are returned also when err is set.
 func LoadDatabase(path string) (*candb.Database, []candb.Diagnostic, string, error) {
-	src, err := os.ReadFile(path)
+	src, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return nil, nil, "", errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot read database: %w", err)
 	}
@@ -177,7 +177,7 @@ func OpenTrace(path string, stdin io.Reader) (capture.Reader, func(), error) {
 	r := stdin
 	closer := func() {}
 	if path != "-" {
-		f, err := os.Open(path)
+		f, err := os.Open(filepath.Clean(path))
 		if err != nil {
 			return nil, nil, errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot open trace: %w", err)
 		}
@@ -305,4 +305,35 @@ func FrameLine(f *canbus.Frame) string {
 		}
 	}
 	return s
+}
+
+// OutputMode is the permission of files canbusctl creates (traces,
+// generated code, converted databases): owner only, as captures can
+// carry vehicle data.
+const OutputMode = 0o600
+
+// CreateOutput creates or truncates the file an operator named on the
+// command line, owner-only.
+func CreateOutput(path string) (*os.File, error) {
+	return os.OpenFile(filepath.Clean(path), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, OutputMode)
+}
+
+// SameFile reports that the paths name one existing file (a link to it
+// included): writing the output would truncate the input being read.
+func SameFile(a, b string) bool {
+	sa, err := os.Stat(filepath.Clean(a))
+	if err != nil {
+		return false
+	}
+	sb, err := os.Stat(filepath.Clean(b))
+	return err == nil && os.SameFile(sa, sb)
+}
+
+// RemovePartial removes an output file left incomplete by a failed
+// command, when path itself is a regular file: never a device, a FIFO or
+// the target of a symbolic link.
+func RemovePartial(path string) {
+	if st, err := os.Lstat(filepath.Clean(path)); err == nil && st.Mode().IsRegular() {
+		_ = os.Remove(filepath.Clean(path))
+	}
 }

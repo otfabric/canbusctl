@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"time"
 
@@ -170,8 +169,8 @@ interface that is not vcan or vxcan nothing is sent without --yes.`,
 			if repeat < 1 {
 				return errs.Invalid("--repeat %d: at least 1", repeat)
 			}
-			if total := repeat * len(frames); limits.maxFrames > 0 && total > limits.maxFrames {
-				return errs.Invalid("%d frames exceed --max-frames %d", total, limits.maxFrames)
+			if exceedsMax(repeat, len(frames), limits.maxFrames) {
+				return errs.Invalid("--repeat %d × %d frames exceed --max-frames %d", repeat, len(frames), limits.maxFrames)
 			}
 			if err := cli.TransmitCheck(iface, yes, "xl send"); err != nil {
 				return err
@@ -240,7 +239,7 @@ XL.`,
 				if err != nil {
 					return err
 				}
-				file, err := os.Create(output)
+				file, err := cli.CreateOutput(output)
 				if err != nil {
 					return errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot create %s: %w", output, err)
 				}

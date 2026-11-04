@@ -34,7 +34,7 @@ func (f *faultFlags) add(c *cobra.Command) {
 
 func (f *faultFlags) config(filter *canbus.FilterSet) (chaos.Config, error) {
 	for _, p := range []float64{f.drop, f.dup, f.delayP, f.reorder, f.corrupt} {
-		if p < 0 || p > 1 {
+		if !(p >= 0 && p <= 1) { // NaN too: it compared false and meant 0
 			return chaos.Config{}, errs.Invalid("fault probabilities lie between 0 and 1")
 		}
 	}
