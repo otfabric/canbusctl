@@ -317,3 +317,23 @@ const OutputMode = 0o600
 func CreateOutput(path string) (*os.File, error) {
 	return os.OpenFile(filepath.Clean(path), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, OutputMode)
 }
+
+// SameFile reports that the paths name one existing file (a link to it
+// included): writing the output would truncate the input being read.
+func SameFile(a, b string) bool {
+	sa, err := os.Stat(filepath.Clean(a))
+	if err != nil {
+		return false
+	}
+	sb, err := os.Stat(filepath.Clean(b))
+	return err == nil && os.SameFile(sa, sb)
+}
+
+// RemovePartial removes an output file left incomplete by a failed
+// command, when path itself is a regular file: never a device, a FIFO or
+// the target of a symbolic link.
+func RemovePartial(path string) {
+	if st, err := os.Lstat(filepath.Clean(path)); err == nil && st.Mode().IsRegular() {
+		_ = os.Remove(filepath.Clean(path))
+	}
+}

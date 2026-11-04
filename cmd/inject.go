@@ -4,7 +4,9 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -36,6 +38,10 @@ func (r injectResult) Text() string {
 	}
 	return s
 }
+
+// maxMalformed bounds --malformed, which sizes a receive queue up front
+// (--max-frames 0 lifts the other bound).
+const maxMalformed = 1 << 16
 
 var errorClasses = map[string]canbus.ErrorInfo{
 	"bus-off":   {Class: canbus.ErrClassBusOff},
@@ -112,7 +118,11 @@ produced. The same --seed gives the same faults.`,
 				for {
 					var f canbus.Frame
 					if err := r.Read(&f); err != nil {
-						break
+						if errors.Is(err, io.EOF) {
+							break
+						}
+						// A malformed record ended the trace silently, injecting a part of it.
+						return &errs.Error{Kind: errs.KindInvalidInput, Code: errs.CodeInvalidCapture, Message: fmt.Sprintf("%s: %v", trace, err), Cause: err}
 					}
 					if !f.IsError() {
 						f.Timestamp, f.Interface, f.Echo = time.Time{}, "", false
@@ -122,6 +132,13 @@ produced. The same --seed gives the same faults.`,
 						return errs.Invalid("the trace has more than --max-frames %d frames", limits.maxFrames)
 					}
 				}
+			}
+			// --malformed sizes a receive queue: bound it before allocating.
+			if malformed < 0 || malformed > maxMalformed {
+				return errs.Invalid("--malformed %d: 0..%d", malformed, maxMalformed)
+			}
+			if limits.maxFrames > 0 && len(src)+malformed > limits.maxFrames {
+				return errs.Invalid("%d source and %d malformed frames exceed --max-frames %d", len(src), malformed, limits.maxFrames)
 			}
 			if len(src) == 0 && info == nil && malformed == 0 {
 				return errs.Invalid("nothing to inject: give --frame, --trace, --error-frame or --malformed")

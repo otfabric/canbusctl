@@ -8,7 +8,7 @@
 | `make coverage-pkg-check` | Every package at least `COVER_PKG_MIN` (90 %); lowest measured in CI: 93.7 % (cmd). The vcan job runs it |
 | `make e2e` | End-to-end tests of the built binary (Linux parts need vcan0, vcan1) |
 | `make interop` | The binary against the canbus-interop images (Docker, vcan0) |
-| `make fuzz` | Fuzz targets of the structured inputs: frame notation, `signal=value`, filters, trace format, database kind |
+| `make fuzz` | Fuzz targets of the structured inputs (frame notation, `signal=value`, filters, trace format, database kind, identifiers, hex bytes and data, CAN XL notation, fault probabilities, `--slcan-*`, send bounds, package names, signal values) and of the read-only commands (`trace info/convert`, `dbc inspect/validate/decode/encode/convert/generate`) on fuzzed files through `cmd.Run`. Failing inputs stay in `testdata/fuzz` |
 | `make cross` | vet for every release platform, linux/arm (32-bit) included |
 | `make check` | fmt, staticcheck, golangci-lint, vet, cross, govulncheck, test, coverage, coverage-pkg-check |
 
@@ -47,6 +47,25 @@ bridge process that drops, duplicates and delays frames, over several seeds,
 never delivers wrong data (the receiver reports the exact message or an
 error), some messages get through, and with every fault (reorder and corrupt
 too) all processes return by their deadlines.
+
+**Seeded fault sweeps** (`cmd/chaos_test.go`, `cmd/chaos_linux_test.go`):
+`inject` and `bridge` (two in-process virtual buses; vcan0 → vcan1 on
+Linux) over several seeds and fault sets check that the counters add up
+(forwarded = received − dropped + duplicated, and as many frames arrive),
+no frame is invented or delivered more than twice, payloads are intact
+without `--corrupt`, the order is kept without `--reorder`, the same seed
+gives the same frames, the bridge returns within its duration and no
+goroutine is left. `CANBUS_CHAOS_ITERATIONS` sets the number of seeds.
+
+**Hostile input** (`cmd/hostile_test.go`, `cmd/safety_test.go`,
+`cmd/interrupt_test.go`, `e2e/hardening_test.go`, `e2e/signal_unix_test.go`):
+huge, deep and out-of-range databases; traces with timestamps out of range
+and frames a target format cannot hold (exit 10 and no output file);
+garbage and over-long lines on stdin; the transmit bounds; `--yes` for every
+transmitting command; SIGINT and SIGTERM of the long-running commands.
+Output paths: `..` is resolved as given, a symbolic link is followed (its
+target written, keeping its mode; an existing file keeps its mode too),
+converting a trace onto itself is refused.
 
 **Interop tests** (`interop/`, build tag `interop`) run the binary against
 the pinned canbus-interop images: `send`/`send-fd` → can-utils, python-can,

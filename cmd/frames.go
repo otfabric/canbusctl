@@ -230,6 +230,29 @@ func addLimitFlags(c *cobra.Command, l *sendLimits, defRate float64) {
 	c.Flags().Float64Var(&l.rate, "rate", defRate, "Transmit at most this many frames per second (0: no limit)")
 	c.Flags().IntVar(&l.maxFrames, "max-frames", 10000, "Transmit at most this many frames")
 	c.Flags().DurationVar(&l.duration, "duration", 0, "Stop transmitting after this time (0: no limit)")
+	// Checked before RunE: a negative or NaN bound would silently mean
+	// "no limit" (replay already refused negative ones through go-canbus).
+	c.PreRunE = func(*cobra.Command, []string) error { return l.validate() }
+}
+
+// validate refuses bounds that do not make sense.
+func (l *sendLimits) validate() error {
+	if !(l.rate >= 0) || math.IsInf(l.rate, 1) {
+		return errs.Invalid("--rate %v: a finite number of frames per second, at least 0 (0: no limit)", l.rate)
+	}
+	if l.maxFrames < 0 {
+		return errs.Invalid("--max-frames %d: at least 0", l.maxFrames)
+	}
+	if l.duration < 0 {
+		return errs.Invalid("--duration %v: at least 0", l.duration)
+	}
+	return nil
+}
+
+// exceedsMax reports that repeat rounds of n frames exceed max (> 0)
+// without computing repeat*n, which can overflow.
+func exceedsMax(repeat, n, max int) bool {
+	return max > 0 && n > 0 && repeat > max/n
 }
 
 type sendResult struct {
@@ -353,9 +376,8 @@ without --yes.`,
 			if repeat < 1 {
 				return errs.Invalid("--repeat %d: at least 1", repeat)
 			}
-			total := repeat * len(frames)
-			if limits.maxFrames > 0 && total > limits.maxFrames {
-				return errs.Invalid("%d frames exceed --max-frames %d", total, limits.maxFrames)
+			if exceedsMax(repeat, len(frames), limits.maxFrames) {
+				return errs.Invalid("--repeat %d × %d frames exceed --max-frames %d", repeat, len(frames), limits.maxFrames)
 			}
 			if err := cli.TransmitCheck(iface, yes, name); err != nil {
 				return err
@@ -437,7 +459,13 @@ type pacer struct {
 func newPacer(rate float64, gap time.Duration) *pacer {
 	p := &pacer{interval: gap}
 	if rate > 0 {
-		if r := time.Duration(float64(time.Second) / rate); r > p.interval {
+		// A tiny rate gives an interval beyond time.Duration: converting it
+		// is implementation-defined (negative on amd64: no limit at all).
+		r := time.Duration(math.MaxInt64)
+		if iv := float64(time.Second) / rate; iv < float64(math.MaxInt64) {
+			r = time.Duration(iv)
+		}
+		if r > p.interval {
 			p.interval = r
 		}
 	}

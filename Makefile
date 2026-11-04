@@ -94,11 +94,13 @@ vuln: ## govulncheck
 	@govulncheck ./...
 
 FUZZTIME ?= 15s
-fuzz: ## Fuzz the structured CLI inputs for FUZZTIME each
-	@for f in FuzzParseFrame FuzzParseAssignments FuzzParseFilters FuzzTraceFormat FuzzDatabaseKind; do \
+fuzz: ## Fuzz the CLI inputs and the read-only commands for FUZZTIME each
+	@for f in FuzzParseFrame FuzzParseAssignments FuzzParseFilters FuzzTraceFormat FuzzDatabaseKind \
+		FuzzParseID FuzzParseHexByte FuzzFrameLine FuzzReadLines FuzzTransmitCheckSlcan; do \
 		go test -run='^$$' -fuzz="^$$f\$$" -fuzztime=$(FUZZTIME) ./internal/cli || exit 1; done
-	@go test -run='^$$' -fuzz='^FuzzParseAssignments$$' -fuzztime=$(FUZZTIME) ./internal/cli
-	@go test -run='^$$' -fuzz='^FuzzParseFilters$$' -fuzztime=$(FUZZTIME) ./internal/cli
+	@for f in FuzzParseHexData FuzzFaultConfig FuzzXLNotation FuzzSignalValue FuzzGoPackageName \
+		FuzzSlcanFlags FuzzSendLimits FuzzReadOnlyCommands; do \
+		go test -run='^$$' -fuzz="^$$f\$$" -fuzztime=$(FUZZTIME) ./cmd || exit 1; done
 
 check: fmt-check lint lint-ci vet cross vuln test coverage coverage-pkg-check ## Everything CI checks except the vcan job
 

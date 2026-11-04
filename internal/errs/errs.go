@@ -144,6 +144,8 @@ func Classify(err error) *Error {
 		return mk(KindInvalidInput, CodeInvalidFrame)
 	case errors.Is(err, canbus.ErrInvalidOption):
 		return mk(KindInvalidInput, CodeInvalidInput)
+	case errors.Is(err, candb.ErrLayout): // a database the parser accepted with a signal layout the codec refuses
+		return mk(KindInvalidInput, CodeInvalidDatabase)
 	case errors.Is(err, candb.ErrRange), errors.Is(err, candb.ErrUnknownSignal), errors.Is(err, candb.ErrMissingSignal),
 		errors.Is(err, candb.ErrInactiveSignal), errors.Is(err, candb.ErrUnknownMessage), errors.Is(err, candb.ErrShortPayload):
 		return mk(KindInvalidInput, CodeInvalidInput)

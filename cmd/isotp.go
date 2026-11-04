@@ -152,6 +152,18 @@ func (r isotpSendResult) Text() string {
 	return fmt.Sprintf("sent %d message(s), %d bytes, on %s", r.Messages, r.Bytes, r.Interface)
 }
 
+// sendSizeLimit is the largest message isotp send builds: --max-size (go-canbus
+// default 4095), never more than ISO-TP's 32-bit length.
+func sendSizeLimit(maxSize int) int64 {
+	switch {
+	case maxSize <= 0:
+		return 4095
+	case int64(maxSize) > 1<<32-1:
+		return 1<<32 - 1
+	}
+	return int64(maxSize)
+}
+
 func newISOTPSendCmd(a *app) *cobra.Command {
 	var (
 		o       isotpFlags
@@ -177,6 +189,11 @@ func newISOTPSendCmd(a *app) *cobra.Command {
 				}
 				payload = p
 			case size > 0:
+				// Refuse before allocating: Send would refuse it anyway, but
+				// --size 900000000000 exhausted memory first.
+				if lim := sendSizeLimit(o.maxSize); int64(size) > lim {
+					return fmt.Errorf("%w: --size %d, at most %d (--max-size)", isotp.ErrTooLarge, size, lim)
+				}
 				payload = make([]byte, size)
 				for i := range payload {
 					payload[i] = byte(i % 251)
@@ -245,6 +262,10 @@ frames (--bs, --stmin). Use "isotp monitor" to observe without sending anything.
 				msg, err := ep.Receive(ctx)
 				if err != nil {
 					if ended(ctx, err) {
+						if count > 0 && cmd.Context().Err() != nil {
+							// SIGINT, not --timeout: exit 130, as documented (it was 5).
+							return errs.New(errs.KindInterrupted, errs.CodeCanceled, "interrupted: received %d of %d messages", n, count)
+						}
 						if count > 0 {
 							return errs.New(errs.KindTimeout, errs.CodeTimeout, "received %d of %d messages", n, count)
 						}
