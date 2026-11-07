@@ -50,7 +50,7 @@ Available Commands:
   stats       Show interface counters and, with --duration, count live traffic per identifier (passive)
   trace       Convert and inspect trace files (candump, JSON Lines, pcap/pcapng, ASC, BLF, TRC)
   up          Bring an interface up (Linux, CAP_NET_ADMIN, needs --yes)
-  version     Print the version of canbusctl and go-canbus
+  version     Print the version, tag, commit, build date, libraries, Go version and platform of canbusctl
   xl          CAN XL frames on SocketCAN (Linux ≥ 6.2, interface mtu 2060) or the virtual bus
 
 Flags:
@@ -975,13 +975,21 @@ Global Flags:
 ## canbusctl version
 
 ```text
-Print the version of canbusctl and go-canbus
+version prints one line:
+
+  canbusctl <version> (tag <tag>, commit <commit>, built <date>, go-canbus <v>, go-serial <v>, <go>, <os>/<arch>)
+
+--json (or --format json) prints the same as one JSON object with the keys
+name, version, tag, commit, built, libraries, go and platform. A development build
+reports version "dev", its VCS commit (with -dirty for local changes) and
+built "unknown"; the tag part is left out when there is no tag.
 
 Usage:
   canbusctl version [flags]
 
 Flags:
   -h, --help   help for version
+      --json   Print one JSON object (as --format json)
 
 Global Flags:
       --format string            Output format: text, json or table (env CANBUSCTL_FORMAT) (default "text")
@@ -993,7 +1001,11 @@ Global Flags:
 ## canbusctl completion
 
 ```text
-Generate a shell completion script
+completion writes a completion script for bash, zsh, fish or PowerShell to
+stdout. Commands, flags, the values of flags with a fixed set (--format,
+--file-format, --addressing, --pattern, --to, --slcan-bitrate, ...) and
+database and trace files by extension complete. Installation: README.md,
+"Shell completion".
 
 Usage:
   canbusctl completion bash|zsh|fish|powershell [flags]

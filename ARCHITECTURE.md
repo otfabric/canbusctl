@@ -6,7 +6,8 @@ exit codes and safety; every CAN operation is a library call.
 ```
 main.go                 build metadata (ldflags), cmd.Execute
 cmd/                    one file per command group (cobra)
-  root.go               Run(ctx, args, stdin, stdout, stderr) → exit code; --format; version; completion
+  root.go               Run(ctx, args, stdin, stdout, stderr) → exit code; --format; version
+  completion.go         completion command; value completion of every flag and argument
   interfaces.go         interfaces, info, configure, up, down     → go-canbus/socketcan/link
   frames.go             monitor, send, send-fd, record, replay, stats → canbus.Bus, capture
   dbc.go                dbc inspect/validate/decode/encode/generate/convert → candb, dbc, kcd, arxml, codegen
@@ -17,6 +18,7 @@ cmd/                    one file per command group (cobra)
   trace.go              trace convert/info → capture (candump, JSON Lines, pcap/pcapng, ASC, BLF)
   transport.go          opens an interface: socketcan.Open, or a port of the in-process virtual bus
 internal/cli            identifiers, frames, filters, signal=value, databases, traces, transmit safety
+internal/buildinfo      version, tag, commit, build date (ldflags, else runtime/debug); version text and JSON
 internal/output         text, table, JSON envelope, JSON Lines streams
 internal/errs           kinds, stable codes, exit codes, classification of go-canbus errors
 e2e/                    tests of the built binary as separate processes (incl. chaos)

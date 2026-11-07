@@ -29,6 +29,8 @@ From source (Go 1.26+): `go install github.com/otfabric/canbusctl@latest`
 
 ### Shell completion
 
+Commands, flags, the values of enum flags (`--format`, `--file-format`, `--to`, `--addressing`, `--pattern`, `--slcan-bitrate`, ...) and database and trace files by extension complete.
+
 ```sh
 # bash (needs the bash-completion package)
 mkdir -p ~/.local/share/bash-completion/completions

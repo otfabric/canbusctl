@@ -10,11 +10,10 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"runtime"
-	"runtime/debug"
 	"strings"
 	"syscall"
 
+	"github.com/otfabric/canbusctl/internal/buildinfo"
 	"github.com/otfabric/canbusctl/internal/errs"
 	"github.com/otfabric/canbusctl/internal/output"
 	"github.com/otfabric/go-canbus/slcan"
@@ -134,6 +133,7 @@ and diagnostics go to stderr. Exit codes: docs/exitcodes.md.`,
 		newDBCCmd(a), newISOTPCmd(a), newSimulateCmd(a), newInjectCmd(a), newTraceCmd(a), newBridgeCmd(a),
 		newXLCmd(a), newVersionCmd(a), newCompletionCmd(),
 	)
+	registerCompletions(root)
 	return root
 }
 
@@ -213,66 +213,32 @@ func Execute() int {
 	return Run(ctx, os.Args[1:], os.Stdin, os.Stdout, os.Stderr)
 }
 
-type versionResult struct {
-	Version   string `json:"version"`
-	Tag       string `json:"tag,omitempty"`
-	Commit    string `json:"commit,omitempty"`
-	BuildDate string `json:"buildDate,omitempty"`
-	GoCanbus  string `json:"goCanbus"`
-	Go        string `json:"go"`
-	Platform  string `json:"platform"`
-}
-
-func (v versionResult) Text() string {
-	s := "canbusctl " + v.Version
-	if v.Commit != "" {
-		s += " (" + v.Commit + ")"
-	}
-	return s + "\ngo-canbus " + v.GoCanbus + "\n" + v.Go + " " + v.Platform
-}
-
 func newVersionCmd(a *app) *cobra.Command {
-	return &cobra.Command{
+	var asJSON bool
+	c := &cobra.Command{
 		Use:   "version",
-		Short: "Print the version of canbusctl and go-canbus",
-		Args:  cobra.NoArgs,
-		RunE: func(*cobra.Command, []string) error {
-			v := versionResult{Version: buildMeta.version, Tag: buildMeta.tag, Commit: buildMeta.commit, BuildDate: buildMeta.buildDate,
-				GoCanbus: "(unknown)", Go: runtime.Version(), Platform: runtime.GOOS + "/" + runtime.GOARCH}
-			if v.Version == "" {
-				v.Version = "dev"
-			}
-			if info, ok := debug.ReadBuildInfo(); ok {
-				for _, d := range info.Deps {
-					if d.Path == "github.com/otfabric/go-canbus" {
-						v.GoCanbus = d.Version
-					}
-				}
-			}
-			return a.emit("version", v)
-		},
-	}
-}
+		Short: "Print the version, tag, commit, build date, libraries, Go version and platform of canbusctl",
+		Long: `version prints one line:
 
-func newCompletionCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:       "completion bash|zsh|fish|powershell",
-		Short:     "Generate a shell completion script",
-		Args:      cobra.ExactArgs(1),
-		ValidArgs: []string{"bash", "zsh", "fish", "powershell"},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			root, out := cmd.Root(), cmd.OutOrStdout()
-			switch args[0] {
-			case "bash":
-				return root.GenBashCompletionV2(out, true)
-			case "zsh":
-				return root.GenZshCompletion(out)
-			case "fish":
-				return root.GenFishCompletion(out, true)
-			case "powershell":
-				return root.GenPowerShellCompletionWithDesc(out)
+  canbusctl <version> (tag <tag>, commit <commit>, built <date>, go-canbus <v>, go-serial <v>, <go>, <os>/<arch>)
+
+--json (or --format json) prints the same as one JSON object with the keys
+name, version, tag, commit, built, libraries, go and platform. A development build
+reports version "dev", its VCS commit (with -dirty for local changes) and
+built "unknown"; the tag part is left out when there is no tag.`,
+		Args: cobra.NoArgs,
+		RunE: func(*cobra.Command, []string) error {
+			i := buildinfo.Resolve("canbusctl", buildMeta.version, buildMeta.tag, buildMeta.commit, buildMeta.buildDate)
+			line := i.Text()
+			if asJSON || a.format == output.JSON {
+				line = i.JSON()
 			}
-			return errs.Invalid("unknown shell %q (bash, zsh, fish or powershell)", args[0])
+			if _, err := fmt.Fprintln(a.out, line); err != nil {
+				return errs.New(errs.KindOutput, errs.CodeOutputFailed, "write output: %w", err)
+			}
+			return nil
 		},
 	}
+	c.Flags().BoolVar(&asJSON, "json", false, "Print one JSON object (as --format json)")
+	return c
 }

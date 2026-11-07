@@ -6,6 +6,45 @@ with the version bump). It computes the tag, builds the binaries for linux
 publishes the GitHub release with the section of this file that matches the
 version as its notes. Add the section before running it.
 
+## v0.10.0
+
+**Date:** unreleased
+**Previous release:** v0.9.0
+
+`version` prints one line in the format shared by every OT Fabric CLI, and
+`version --json` one JSON object; shell completion covers every flag.
+
+- `version`: `canbusctl 0.10.0 (tag v0.10.0, commit <full sha>, built
+  <RFC 3339 UTC>, go-canbus 0.8.0, go-serial 0.2.1, go1.26.x, linux/amd64)`:
+  the OT Fabric libraries the binary is built on come after the build date. A development
+  build (`go build`, `go run`, `make build` off a tag) reports `dev`, the VCS
+  commit with `-dirty` for local changes (`go build`) and `built unknown`;
+  `go install …@v0.10.0` reports `0.10.0`.
+- `version --json` (new flag; also `--format json` and
+  `CANBUSCTL_FORMAT=json`): `{"name","version","tag","commit","built",
+  "libraries","go","platform"}` on one line, every key always present;
+  `libraries` is
+  `[{"name":"go-canbus","version":"0.8.0"},{"name":"go-serial","version":"0.2.1"}]`.
+- **The version output changed.** The text form was three lines; the JSON
+  form was the `schemaVersion`/`command`/`result` envelope with `version`,
+  `tag`, `commit`, `buildDate`, `goCanbus`, `go`, `platform`. Scripts that
+  parse `canbusctl version` must change: `buildDate` is now `built`,
+  `goCanbus` is now the `libraries` entry `go-canbus` (version without the
+  leading `v`), and there is no envelope. No other command's output changes.
+- Shell completion (`completion bash|zsh|fish|powershell`) completes the
+  values of every flag with a fixed set (`--format`, `--slcan-bitrate`,
+  `--slcan-data-bitrate`, `--mtu`, `--dlc`, `--tx-dl`, `--file-format`,
+  `--addressing`, `--pattern`, `--error-frame`, `dbc convert --to`), database
+  files (`.dbc`, `.kcd`, `.arxml`) for `--dbc` and the `dbc` commands, trace
+  files by extension for `--trace`, `--output`, `replay`, `trace convert` and
+  `trace info`, and no file names for free values (interfaces, identifiers,
+  numbers, durations).
+- `make build` injects the full commit SHA; the version and tag only when
+  HEAD is exactly on a tag (without the leading `v` in the version, as the
+  Release workflow does), so a build off a tag reports `dev`.
+
+---
+
 ## v0.9.0
 
 **Date:** 2026-11-07
