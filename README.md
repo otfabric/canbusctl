@@ -27,6 +27,26 @@ Linux (amd64, arm64, armv7), macOS (Intel, Apple silicon) and Windows (amd64, ar
 
 From source (Go 1.26+): `go install github.com/otfabric/canbusctl@latest`
 
+### Shell completion
+
+```sh
+# bash (needs the bash-completion package)
+mkdir -p ~/.local/share/bash-completion/completions
+canbusctl completion bash > ~/.local/share/bash-completion/completions/canbusctl
+
+# zsh: a directory on your fpath, then restart the shell
+mkdir -p ~/.zsh/completions && canbusctl completion zsh > ~/.zsh/completions/_canbusctl
+# and once in ~/.zshrc:  fpath=(~/.zsh/completions $fpath); autoload -U compinit && compinit
+
+# fish
+mkdir -p ~/.config/fish/completions && canbusctl completion fish > ~/.config/fish/completions/canbusctl.fish
+```
+
+```powershell
+# PowerShell: add this line to your profile ($PROFILE)
+canbusctl completion powershell | Out-String | Invoke-Expression
+```
+
 ## At a glance
 
 ```sh
