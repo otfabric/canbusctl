@@ -61,7 +61,7 @@ CAN frames can move brakes, drives and power electronics. canbusctl is
   the adapter does not even acknowledge frames.
 - Every transmitting command refuses to send on an interface that is not
   virtual — not `vcan`, `vxcan` or the in-process bus `virtual` — unless
-  `--yes` is given (exit 9). The kind is read from the kernel (rtnetlink);
+  `--yes` is given (exit 13). The kind is read from the kernel (rtnetlink);
   a serial-line CAN adapter (`slcan:`) always needs `--yes`.
 - Transmissions are bounded: `--max-frames` (default 10000), `--duration`,
   `--rate`; `simulate` always has a duration (default 10 s).

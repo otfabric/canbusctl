@@ -127,11 +127,11 @@ func TestTransmitSafety(t *testing.T) {
 	}
 	r = run(t, "", "send", "-i", "lo", "123#00", "--format", "json")
 	if linux() {
-		want(t, r, 9, `"code": "confirmation_required"`, "--yes")
+		want(t, r, 13, `"code": "confirmation_required"`, "--yes")
 	}
-	want(t, run(t, "", "up", "vcan0"), 9, "--yes")
-	want(t, run(t, "", "down", "vcan0"), 9, "--yes")
-	want(t, run(t, "", "configure", "vcan0", "--bitrate", "500000"), 9, "--yes")
+	want(t, run(t, "", "up", "vcan0"), 13, "--yes")
+	want(t, run(t, "", "down", "vcan0"), 13, "--yes")
+	want(t, run(t, "", "configure", "vcan0", "--bitrate", "500000"), 13, "--yes")
 }
 
 func writeTrace(t *testing.T, format capture.Format, frames []canbus.Frame) string {

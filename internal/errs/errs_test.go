@@ -41,7 +41,7 @@ func TestClassify(t *testing.T) {
 			t.Errorf("%v: %s %d", c.err, e.Kind, ExitCode(e.Kind))
 		}
 	}
-	for k, code := range map[Kind]int{KindUsage: 2, KindOutput: 10, KindProtocol: 6} {
+	for k, code := range map[Kind]int{KindUsage: 2, KindOutput: 10, KindProtocol: 6, KindPermission: 9, KindSafety: 13} {
 		if ExitCode(k) != code {
 			t.Errorf("%s", k)
 		}

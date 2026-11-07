@@ -24,7 +24,7 @@ This repository follows **otfabric/engineering policy 1.4**, profile **cli** (`.
 ## Hard rules
 
 1. Exit codes and JSON output are a public contract: changing a code or a field is a breaking change with a RELEASE.md note.
-2. A transmission on an interface that is not virtual and every administrative change require `--yes` (exit 9 otherwise). Read-only is the default.
+2. A transmission on an interface that is not virtual and every administrative change require `--yes` (exit 13 otherwise). Read-only is the default.
 3. Never lower `COVERAGE_MIN`, add lint suppressions, or skip or delete tests to make CI pass.
 4. go-canbus is pinned to a released tag; no `replace` directives.
 

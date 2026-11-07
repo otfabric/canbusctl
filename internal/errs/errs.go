@@ -45,9 +45,9 @@ const (
 	ExitTimeout      = 5
 	ExitProtocol     = 6
 	ExitUnsupported  = 8
-	ExitPermission   = 9 // also a safety refusal: the organisation table has one code for both
-	ExitSafety       = 9
+	ExitPermission   = 9
 	ExitInternal     = 10
+	ExitSafety       = 13  // a refusal for safety: a transmission or an administrative change without --yes
 	ExitInterrupted  = 130 // 128 + SIGINT, as a shell reports it
 )
 

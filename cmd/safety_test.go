@@ -34,7 +34,7 @@ func withIface(args []string, iface string) []string {
 }
 
 // TestTransmitNeedsYes: every transmitting command refuses an interface
-// that is not virtual without --yes (exit 9, confirmation_required)
+// that is not virtual without --yes (exit 13, confirmation_required)
 // before it opens it: a serial-line adapter behind a TCP serial server
 // is never even connected to.
 func TestTransmitNeedsYes(t *testing.T) {
@@ -61,12 +61,12 @@ func TestTransmitNeedsYes(t *testing.T) {
 	for _, iface := range ifaces {
 		for _, c := range transmitting {
 			args := append(withIface(c, iface), "--format", "json")
-			want(t, run(t, "", args...), 9, `"code": "confirmation_required"`, "--yes")
+			want(t, run(t, "", args...), 13, `"code": "confirmation_required"`, "--yes")
 		}
 	}
 	for _, c := range [][]string{{"up", "vcan0"}, {"down", "vcan0"}, {"up", "virtual"}, {"configure", "vcan0", "--mtu", "72"},
 		{"configure", "can0", "--restart"}, {"configure", "can0", "--bitrate", "500000", "--fd"}} {
-		want(t, run(t, "", append(c, "--format", "json")...), 9, `"code": "confirmation_required"`)
+		want(t, run(t, "", append(c, "--format", "json")...), 13, `"code": "confirmation_required"`)
 	}
 	time.Sleep(50 * time.Millisecond)
 	if n := accepted.Load(); n != 0 {
@@ -74,7 +74,7 @@ func TestTransmitNeedsYes(t *testing.T) {
 	}
 	// With --yes the check passes and the adapter is opened.
 	r := run(t, "", "send", "-i", "slcan:tcp://"+ln.Addr().String(), "--yes", "123#00")
-	if r.code == 9 {
+	if r.code == 13 {
 		t.Fatalf("--yes refused: %s", r.errOut)
 	}
 	for end := time.Now().Add(2 * time.Second); accepted.Load() == 0 && time.Now().Before(end); {

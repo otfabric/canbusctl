@@ -6,6 +6,26 @@ with the version bump). It computes the tag, builds the binaries for linux
 publishes the GitHub release with the section of this file that matches the
 version as its notes. Add the section before running it.
 
+## v0.9.0
+
+**Date:** 2026-11-07
+**Previous release:** v0.8.0
+
+A safety refusal gets its own exit code, 13, as in the organisation table
+(otfabric/engineering `standards/api-design.md#cli-exit-codes`); 9 now means
+a missing privilege only. **Scripts that test for the safety exit code must
+change.**
+
+| Case | Old | New |
+|---|---|---|
+| Refused for safety without `--yes` (`safety`, `confirmation_required`): a transmission on an interface that is not virtual, or an administrative change | 9 | 13 |
+
+All other codes are unchanged; `permission` (CAP_NET_ADMIN) stays 9. The
+JSON error document is unchanged: `kind` `safety` and `code`
+`confirmation_required` as before.
+
+---
+
 ## v0.8.0
 
 **Date:** 2026-11-04
