@@ -13,6 +13,22 @@ ARXML): capture, decode, convert, diagnose, transmit, replay, simulate and
 test under faults. Built on
 [go-canbus](https://github.com/otfabric/go-canbus); pure Go, one static binary.
 
+## Install
+
+```sh
+curl -fsSL https://get.otfabric.io/canbusctl | sh
+```
+
+```powershell
+irm https://get.otfabric.io/canbusctl.ps1 | iex
+```
+
+Linux (amd64, arm64, armv7), macOS (Intel, Apple silicon) and Windows (amd64, arm64). The installer verifies the release's SHA-256 checksum, installs per user without `sudo` (`~/.local/bin`, Windows `%LOCALAPPDATA%\OTFabric\bin`), and upgrades in place when run again. Pin a version with `OTF_VERSION=x.y.z`; for CI, containers and device images use `OTF_UNMANAGED_INSTALL=<dir>`; all options: [otfabric/install](https://github.com/otfabric/install#options). For offline machines, the archives and checksums are on [Releases](https://github.com/otfabric/canbusctl/releases).
+
+From source (Go 1.26+): `go install github.com/otfabric/canbusctl@latest`
+
+## At a glance
+
 ```sh
 canbusctl monitor -i can0 --dbc vehicle.dbc                 # watch and decode, passively
 canbusctl dbc encode vehicle.dbc Engine Speed=1500 Gear=Second
@@ -30,20 +46,6 @@ canbusctl isotp send -i vcan0 --tx-id 7E0 --rx-id 7E8 --data 0322F190
 canbusctl simulate --dbc vehicle.dbc --duration 5s           # in-process virtual bus
 canbusctl dbc generate vehicle.dbc -o vehicle/vehicle.go
 ```
-
-## Install
-
-```sh
-curl -fsSL https://get.otfabric.io/canbusctl | sh
-```
-
-```powershell
-irm https://get.otfabric.io/canbusctl.ps1 | iex
-```
-
-Linux (amd64, arm64, armv7), macOS (Intel, Apple silicon) and Windows (amd64, arm64). The installer verifies the release's SHA-256 checksum, installs per user without `sudo` (`~/.local/bin`, Windows `%LOCALAPPDATA%\OTFabric\bin`), and upgrades in place when run again. Pin a version with `OTF_VERSION=x.y.z`; for CI, containers and device images use `OTF_UNMANAGED_INSTALL=<dir>`; all options: [otfabric/install](https://github.com/otfabric/install#options). For offline machines, the archives and checksums are on [Releases](https://github.com/otfabric/canbusctl/releases).
-
-From source (Go 1.26+): `go install github.com/otfabric/canbusctl@latest`
 
 ## Commands
 
