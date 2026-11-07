@@ -58,7 +58,7 @@ func TestConfigureValidation(t *testing.T) {
 	want(t, run(t, "", "configure", "vcan0", "--sample-point", "120"), 3, "percentage")
 	want(t, run(t, "", "configure", "vcan0", "--mtu", "50"), 3, "--mtu")
 	r := run(t, "", "configure", "vcan0", "--fd", "--listen-only=false", "--dbitrate", "2000000", "--dsample-point", "75", "--restart-ms", "100", "--one-shot", "--berr-reporting", "--loopback")
-	want(t, r, 9)
+	want(t, r, 13)
 }
 
 type canbusFrame = canbus.Frame

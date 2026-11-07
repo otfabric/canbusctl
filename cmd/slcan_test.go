@@ -140,7 +140,7 @@ func TestSlcanMonitorErrors(t *testing.T) {
 func TestSlcanSendNeedsYes(t *testing.T) {
 	ad := newAdapter(t)
 	r := run(t, "", "send", "-i", ad.iface(), "123#01")
-	want(t, r, 9)
+	want(t, r, 13)
 	if !strings.Contains(r.errOut, "serial-line CAN adapter") {
 		t.Fatal(r.errOut)
 	}

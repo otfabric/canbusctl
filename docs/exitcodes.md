@@ -7,7 +7,8 @@ also for usage errors.
 
 The table follows the organisation table
 (otfabric/engineering `standards/api-design.md#cli-exit-codes`). Older versions used 7 for
-`permission` and 10 for an interrupted command; see RELEASE.md.
+`permission`, 10 for an interrupted command and 9 for a safety refusal; see
+RELEASE.md.
 
 | Code | Kind | Meaning |
 |------|------|---------|
@@ -19,8 +20,9 @@ The table follows the organisation table
 | 5 | `timeout` | A deadline passed: an ISO-TP peer did not answer (N_Bs) or `isotp receive` got fewer messages than `--count` in `--timeout` |
 | 6 | `protocol` | ISO-TP protocol failure: receiver overflow, wrong sequence number, too many WAIT flow controls, invalid flow control |
 | 8 | `unsupported` | Not available here: SocketCAN and netlink on macOS/Windows, bit timing on vcan, CAN FD on a classical interface, error frames on SocketCAN, `dbc convert --to kcd` |
-| 9 | `safety`, `permission` | Refused for safety: a transmission on an interface that is not virtual, or an administrative change, without `--yes`. `permission`: a privilege is missing: CAP_NET_ADMIN for `up`, `down`, `configure` |
+| 9 | `permission` | A privilege is missing: CAP_NET_ADMIN for `up`, `down`, `configure` |
 | 10 | `output`, `internal` | The result could not be written, or something unexpected happened |
+| 13 | `safety` | Refused for safety: a transmission on an interface that is not virtual, or an administrative change, without `--yes` |
 | 130 | `interrupted` | SIGINT or SIGTERM stopped a command before it had a result (`code` `canceled`). Streams stopped that way end with 0 |
 
 `kind` selects the exit code; `code` in the JSON error is a stable, finer
@@ -50,7 +52,7 @@ identifier:
 `--count`, `--duration` or Ctrl-C (SIGINT/SIGTERM).
 
 **Transmitting commands** validate everything before the first frame: an
-invocation that exits 2, 3, 8 or 9 has sent nothing. `replay` reads a whole
+invocation that exits 2, 3, 8 or 13 has sent nothing. `replay` reads a whole
 trace file before sending, so a malformed record anywhere in it exits 3.
 From standard input (`-`) it cannot: a malformed record after frames were
 sent exits 10 with code `invalid_capture` and the number of frames sent.

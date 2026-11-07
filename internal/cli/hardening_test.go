@@ -112,7 +112,7 @@ func FuzzTransmitCheckSlcan(f *testing.F) {
 	}
 	f.Fuzz(func(t *testing.T, s string) {
 		err := TransmitCheck(SlcanPrefix+s, false, "send")
-		if e, ok := errors.AsType[*errs.Error](err); !ok || e.Kind != errs.KindSafety || errs.ExitCode(e.Kind) != 9 {
+		if e, ok := errors.AsType[*errs.Error](err); !ok || e.Kind != errs.KindSafety || errs.ExitCode(e.Kind) != 13 {
 			t.Fatalf("%q: %v", s, err)
 		}
 		if TransmitCheck(SlcanPrefix+s, true, "send") != nil {

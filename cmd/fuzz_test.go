@@ -26,7 +26,7 @@ import (
 )
 
 // documentedExit is the set of exit codes of docs/exitcodes.md.
-var documentedExit = map[int]bool{0: true, 1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 8: true, 9: true, 10: true, 130: true}
+var documentedExit = map[int]bool{0: true, 1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 8: true, 9: true, 10: true, 13: true, 130: true}
 
 // runQuick runs canbusctl in process under a short deadline: fuzz
 // targets must not wait.
