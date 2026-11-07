@@ -3,6 +3,13 @@
 All notable changes are listed here; release notes are in
 [RELEASE.md](RELEASE.md).
 
+## v0.9.0 (2026-11-07)
+
+Breaking: a safety refusal (a state-changing operation on a live, non-virtual
+interface without `--yes`) exits 13 instead of 9. Exit 9 now means a missing
+privilege only (for example CAP_NET_ADMIN). docsync checks the CLI's
+commands, flags, exit codes and examples against the docs.
+
 ## v0.8.0 (2026-11-04)
 
 go-canbus v0.8.0, Go 1.26 minimum. Output files are created 0600.
