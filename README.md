@@ -31,6 +31,20 @@ canbusctl simulate --dbc vehicle.dbc --duration 5s           # in-process virtua
 canbusctl dbc generate vehicle.dbc -o vehicle/vehicle.go
 ```
 
+## Install
+
+```sh
+curl -fsSL https://get.otfabric.io/canbusctl | sh
+```
+
+```powershell
+irm https://get.otfabric.io/canbusctl.ps1 | iex
+```
+
+Linux (amd64, arm64, armv7), macOS (Intel, Apple silicon) and Windows (amd64, arm64). The installer verifies the release's SHA-256 checksum, installs per user without `sudo` (`~/.local/bin`, Windows `%LOCALAPPDATA%\OTFabric\bin`), and upgrades in place when run again. Pin a version with `OTF_VERSION=x.y.z`; for CI, containers and device images use `OTF_UNMANAGED_INSTALL=<dir>`; all options: [otfabric/install](https://github.com/otfabric/install#options). For offline machines, the archives and checksums are on [Releases](https://github.com/otfabric/canbusctl/releases).
+
+From source (Go 1.26+): `go install github.com/otfabric/canbusctl@latest`
+
 ## Commands
 
 | Group | Commands | Transmits? |
@@ -89,15 +103,6 @@ CANtact, USBtin and LAWICEL CANUSB work on every OS without a kernel driver:
 slcan has no error frames, error state indicator or hardware filters
 (`--filter` is applied in software). Other adapters (PEAK, Kvaser, Vector)
 are not supported: see [LIMITATIONS.md](LIMITATIONS.md).
-
-## Install
-
-Binaries for every platform above are attached to each
-[GitHub release](https://github.com/otfabric/canbusctl/releases). From source:
-
-```sh
-go install github.com/otfabric/canbusctl@latest
-```
 
 Hardware-free experiments on Linux:
 
