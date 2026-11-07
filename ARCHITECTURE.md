@@ -37,8 +37,8 @@ vcan and vxcan (kind from rtnetlink) pass; anything else needs `--yes`.
 Administrative commands need `--yes` regardless.
 
 **Errors.** Commands return typed `errs.Error`s or go-canbus errors;
-`errs.Classify` maps go-canbus sentinels (ErrUnsupported, ErrInterfaceDown,
-isotp.ErrTimeout, candb.ErrRange, ...) to kinds and exit codes. cobra's own
+`errs.Classify` maps go-canbus sentinels (`canbus.ErrUnsupported`, `canbus.ErrInterfaceDown`,
+`isotp.ErrTimeout`, `candb.ErrRange`, ...) to kinds and exit codes. cobra's own
 command-line errors are usage errors (2).
 
 **Faults.** `bridge` and `inject` share the go-canbus `chaos` package (and

@@ -2,8 +2,17 @@
 
 ## Reporting
 
-Report vulnerabilities privately through GitHub's security advisories of
-otfabric/canbusctl ("Report a vulnerability"), not in public issues.
+Report vulnerabilities privately, not in public issues: email
+**security@otfabric.io**, or open a private advisory on GitHub (the
+[Security](https://github.com/otfabric/canbusctl/security) tab, "Report a
+vulnerability"). Include the `canbusctl version` output.
+
+## Supported versions
+
+| Version | Supported |
+|---------|-----------|
+| Latest release | Yes |
+| Older releases | Best effort |
 
 ## Operational safety
 
