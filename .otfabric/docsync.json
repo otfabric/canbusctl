@@ -1,0 +1,9 @@
+{
+  "clis": [
+    {
+      "name": "canbusctl",
+      "manifest": "./cmd",
+      "exit_codes": "internal/errs"
+    }
+  ]
+}
