@@ -42,12 +42,14 @@ counters (v0.2.0: `received`, `forwarded` and `reordered` are new).
 line, no envelope, the same keys in this order in every OT Fabric CLI:
 
 ```json
-{"name":"canbusctl","version":"0.10.0","tag":"v0.10.0","commit":"1802d0f9afe8642d1e278120b76fcdfac967cb9e","built":"2026-11-05T15:41:49Z","go":"go1.26.10","platform":"linux/amd64"}
+{"name":"canbusctl","version":"0.10.0","tag":"v0.10.0","commit":"1802d0f9afe8642d1e278120b76fcdfac967cb9e","built":"2026-11-05T15:41:49Z","libraries":[{"name":"go-canbus","version":"0.8.0"},{"name":"go-serial","version":"0.2.1"}],"go":"go1.26.10","platform":"linux/amd64"}
 ```
 
 Every key is always present. A development build has `"version":"dev"`,
 `"tag":""`, its VCS commit (`-dirty` with local changes) or `"unknown"`, and
-`"built":"unknown"`.
+`"built":"unknown"`. `libraries` lists the OT Fabric libraries
+(`github.com/otfabric/go-*`) the binary is built on, sorted by name, with
+their versions without the leading `v`; `[]` when there are none.
 
 ## Streams
 

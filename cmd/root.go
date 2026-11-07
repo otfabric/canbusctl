@@ -217,13 +217,13 @@ func newVersionCmd(a *app) *cobra.Command {
 	var asJSON bool
 	c := &cobra.Command{
 		Use:   "version",
-		Short: "Print the version, tag, commit, build date, Go version and platform of canbusctl",
+		Short: "Print the version, tag, commit, build date, libraries, Go version and platform of canbusctl",
 		Long: `version prints one line:
 
-  canbusctl <version> (tag <tag>, commit <commit>, built <date>, <go>, <os>/<arch>)
+  canbusctl <version> (tag <tag>, commit <commit>, built <date>, go-canbus <v>, go-serial <v>, <go>, <os>/<arch>)
 
 --json (or --format json) prints the same as one JSON object with the keys
-name, version, tag, commit, built, go and platform. A development build
+name, version, tag, commit, built, libraries, go and platform. A development build
 reports version "dev", its VCS commit (with -dirty for local changes) and
 built "unknown"; the tag part is left out when there is no tag.`,
 		Args: cobra.NoArgs,

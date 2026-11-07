@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/otfabric/canbusctl/internal/buildinfo"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -17,13 +18,21 @@ func TestVersionCommand(t *testing.T) {
 	plat := runtime.Version() + ", " + runtime.GOOS + "/" + runtime.GOARCH
 	SetBuildMeta("0.10.0", "v0.10.0", "abc123", "2026-11-05T15:41:49Z")
 	t.Cleanup(func() { SetBuildMeta("dev", "", "", "") })
-	line := "canbusctl 0.10.0 (tag v0.10.0, commit abc123, built 2026-11-05T15:41:49Z, " + plat + ")\n"
+	// The libraries are those of the test binary (go-canbus); their
+	// formatting is tested in internal/buildinfo.
+	var libs, jlibs []string
+	for _, l := range buildinfo.Resolve("canbusctl", "", "", "", "").Libraries {
+		libs = append(libs, l.Name+" "+l.Version+", ")
+		jlibs = append(jlibs, `{"name":"`+l.Name+`","version":"`+l.Version+`"}`)
+	}
+	line := "canbusctl 0.10.0 (tag v0.10.0, commit abc123, built 2026-11-05T15:41:49Z, " + strings.Join(libs, "") + plat + ")\n"
 	for _, args := range [][]string{{"version"}, {"version", "--format", "table"}, {"version", "--format", "text"}} {
 		if r := run(t, "", args...); r.code != 0 || r.out != line {
 			t.Fatalf("%q: exit %d, %q, want %q", args, r.code, r.out, line)
 		}
 	}
-	js := `{"name":"canbusctl","version":"0.10.0","tag":"v0.10.0","commit":"abc123","built":"2026-11-05T15:41:49Z","go":"` +
+	js := `{"name":"canbusctl","version":"0.10.0","tag":"v0.10.0","commit":"abc123","built":"2026-11-05T15:41:49Z","libraries":[` +
+		strings.Join(jlibs, ",") + `],"go":"` +
 		runtime.Version() + `","platform":"` + runtime.GOOS + "/" + runtime.GOARCH + "\"}\n"
 	for _, args := range [][]string{{"version", "--json"}, {"version", "--format", "json"}, {"--format=json", "version"}} {
 		if r := run(t, "", args...); r.code != 0 || r.out != js {

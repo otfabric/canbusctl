@@ -50,7 +50,7 @@ Available Commands:
   stats       Show interface counters and, with --duration, count live traffic per identifier (passive)
   trace       Convert and inspect trace files (candump, JSON Lines, pcap/pcapng, ASC, BLF, TRC)
   up          Bring an interface up (Linux, CAP_NET_ADMIN, needs --yes)
-  version     Print the version, tag, commit, build date, Go version and platform of canbusctl
+  version     Print the version, tag, commit, build date, libraries, Go version and platform of canbusctl
   xl          CAN XL frames on SocketCAN (Linux ≥ 6.2, interface mtu 2060) or the virtual bus
 
 Flags:
@@ -977,10 +977,10 @@ Global Flags:
 ```text
 version prints one line:
 
-  canbusctl <version> (tag <tag>, commit <commit>, built <date>, <go>, <os>/<arch>)
+  canbusctl <version> (tag <tag>, commit <commit>, built <date>, go-canbus <v>, go-serial <v>, <go>, <os>/<arch>)
 
 --json (or --format json) prints the same as one JSON object with the keys
-name, version, tag, commit, built, go and platform. A development build
+name, version, tag, commit, built, libraries, go and platform. A development build
 reports version "dev", its VCS commit (with -dirty for local changes) and
 built "unknown"; the tag part is left out when there is no tag.
 

@@ -6,10 +6,11 @@ All notable changes are listed here; release notes are in
 ## v0.10.0 (unreleased)
 
 `version` prints the OT Fabric one-line format (`canbusctl 0.10.0 (tag
-v0.10.0, commit …, built …, go…, os/arch)`); `version --json` (or
-`--format json`) one flat JSON object with `name`, `version`, `tag`,
-`commit`, `built`, `go`, `platform`, replacing the envelope and its
-`buildDate`/`goCanbus` fields. Shell completion completes the values of
+v0.10.0, commit …, built …, go-canbus 0.8.0, go-serial 0.2.1, go…, os/arch)`);
+`version --json` (or `--format json`) one flat JSON object with `name`,
+`version`, `tag`, `commit`, `built`, `libraries`, `go`, `platform`,
+replacing the envelope (`buildDate` is `built`, `goCanbus` a `libraries`
+entry). Shell completion completes the values of
 every enum flag and database and trace files by extension.
 
 ## v0.9.0 (2026-11-07)
