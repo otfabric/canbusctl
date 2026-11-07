@@ -3,6 +3,9 @@
 package cmd
 
 import (
+	"bytes"
+	"context"
+	"errors"
 	"regexp"
 	"runtime"
 	"slices"
@@ -52,6 +55,24 @@ func TestVersionCommand(t *testing.T) {
 	want(t, run(t, "", "version", "extra"), 2)
 }
 
+// failWriter fails every write, as a closed stdout does.
+type failWriter struct{}
+
+func (failWriter) Write([]byte) (int, error) { return 0, errors.New("closed") }
+
+// A version line that cannot be written is an output failure (exit 10).
+func TestVersionWriteError(t *testing.T) {
+	for _, args := range [][]string{{"version"}, {"version", "--json"}} {
+		var errOut bytes.Buffer
+		if code := Run(context.Background(), args, strings.NewReader(""), failWriter{}, &errOut); code != 10 {
+			t.Errorf("%q: exit %d, want 10\n%s", args, code, errOut.String())
+		}
+		if !strings.Contains(errOut.String(), "write output") {
+			t.Errorf("%q: stderr %q, want the write error", args, errOut.String())
+		}
+	}
+}
+
 // complete runs the hidden __complete command and returns the candidates
 // (without descriptions) and the directive line.
 func complete(t *testing.T, args ...string) ([]string, string) {
@@ -96,6 +117,11 @@ func TestCompletionValues(t *testing.T) {
 		{[]string{"isotp", "receive", "--tx-dl", ""}, []string{"8", "12", "16", "20", "24", "32", "48", "64"}, noFile},
 		{[]string{"trace", "convert", "--file-format", ""}, []string{"candump", "jsonl", "pcap", "pcapng", "asc", "blf", "trc"}, noFile},
 		{[]string{"trace", "info", ""}, []string{"log", "txt", "jsonl", "pcap", "pcapng", "asc", "blf", "trc"}, fileExt},
+		{[]string{"trace", "info", "a.log", ""}, nil, noFile},
+		{[]string{"dbc", "inspect", "x.dbc", ""}, nil, noFile},
+		{[]string{"trace", "convert", ""}, []string{"log", "txt", "jsonl", "pcap", "pcapng", "asc", "blf", "trc"}, fileExt},
+		{[]string{"trace", "convert", "a.log", ""}, []string{"log", "jsonl", "pcap", "pcapng", "asc", "blf", "trc"}, fileExt},
+		{[]string{"trace", "convert", "a.log", "b.pcap", ""}, nil, noFile},
 		{[]string{"simulate", "--pattern", ""}, []string{"counter", "random", "initial"}, noFile},
 		{[]string{"inject", "--error-frame", ""}, []string{"bus-off", "passive", "warning", "no-ack", "stuff", "overflow", "restarted"}, noFile},
 		{[]string{"bridge", "--side-a", ""}, nil, noFile},
