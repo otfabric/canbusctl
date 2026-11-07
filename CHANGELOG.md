@@ -3,6 +3,15 @@
 All notable changes are listed here; release notes are in
 [RELEASE.md](RELEASE.md).
 
+## v0.10.0 (unreleased)
+
+`version` prints the OT Fabric one-line format (`canbusctl 0.10.0 (tag
+v0.10.0, commit …, built …, go…, os/arch)`); `version --json` (or
+`--format json`) one flat JSON object with `name`, `version`, `tag`,
+`commit`, `built`, `go`, `platform`, replacing the envelope and its
+`buildDate`/`goCanbus` fields. Shell completion completes the values of
+every enum flag and database and trace files by extension.
+
 ## v0.9.0 (2026-11-07)
 
 Breaking: a safety refusal (a state-changing operation on a live, non-virtual

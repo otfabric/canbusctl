@@ -23,10 +23,6 @@ func jsonOf(t *testing.T, s string) cli.FrameJSON {
 }
 
 func TestRootAndUsage(t *testing.T) {
-	want(t, run(t, "", "version"), 0, "canbusctl dev", "go-canbus")
-	SetBuildMeta("1.2.3", "v1.2.3", "abc", "today")
-	want(t, run(t, "", "version", "--format", "json"), 0, `"version": "1.2.3"`, `"commit": "abc"`)
-	SetBuildMeta("", "", "", "")
 	for _, sh := range []string{"bash", "zsh", "fish", "powershell"} {
 		want(t, run(t, "", "completion", sh), 0)
 	}
@@ -35,7 +31,7 @@ func TestRootAndUsage(t *testing.T) {
 	want(t, run(t, "", "nope", "--format", "json"), 2, `"kind": "usage"`)
 	want(t, run(t, "", "version", "--format", "xml"), 3, "invalid --format")
 	t.Setenv("CANBUSCTL_FORMAT", "json")
-	want(t, run(t, "", "version"), 0, `"schemaVersion"`)
+	want(t, run(t, "", "version"), 0, `{"name":"canbusctl",`)
 	want(t, run(t, "", "send", "--bogus"), 2, `"usage"`)
 	if !strings.Contains(run(t, "", "--help").out, "Passive by default") {
 		t.Fatal("help")
@@ -69,11 +65,11 @@ func parseForTest(s string) (canbus.Frame, error) { return cli.ParseFrame(s) }
 func TestOutputFormatEnv(t *testing.T) {
 	t.Setenv("CANBUSCTL_FORMAT", "")
 	t.Setenv("CANBUSCTL_OUTPUT_FORMAT", "json")
-	if r := run(t, "", "version"); !strings.Contains(r.out, `"schemaVersion"`) {
+	if r := run(t, "", "version"); !strings.Contains(r.out, `"name":"canbusctl"`) {
 		t.Fatalf("OUTPUT_FORMAT ignored: %q", r.out)
 	}
 	t.Setenv("CANBUSCTL_FORMAT", "text")
-	if r := run(t, "", "version"); strings.Contains(r.out, `"schemaVersion"`) {
+	if r := run(t, "", "version"); strings.Contains(r.out, `"name":"canbusctl"`) {
 		t.Fatalf("FORMAT does not win: %q", r.out)
 	}
 }

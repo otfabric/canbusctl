@@ -6,6 +6,40 @@ with the version bump). It computes the tag, builds the binaries for linux
 publishes the GitHub release with the section of this file that matches the
 version as its notes. Add the section before running it.
 
+## v0.10.0
+
+**Date:** unreleased
+**Previous release:** v0.9.0
+
+`version` prints one line in the format shared by every OT Fabric CLI, and
+`version --json` one JSON object; shell completion covers every flag.
+
+- `version`: `canbusctl 0.10.0 (tag v0.10.0, commit <full sha>, built
+  <RFC 3339 UTC>, go1.26.x, linux/amd64)`. A development build (`go build`,
+  `go run`) reports `dev`, the VCS commit with `-dirty` for local changes and
+  `built unknown`; `go install …@v0.10.0` reports `0.10.0`.
+- `version --json` (new flag; also `--format json` and
+  `CANBUSCTL_FORMAT=json`): `{"name","version","tag","commit","built","go",
+  "platform"}` on one line, every key always present.
+- **The version output changed.** The text form was three lines (with
+  go-canbus); the JSON form was the `schemaVersion`/`command`/`result`
+  envelope with `version`, `tag`, `commit`, `buildDate`, `goCanbus`, `go`,
+  `platform`. Scripts that parse `canbusctl version` must change: `buildDate`
+  is now `built`, `goCanbus` is gone, and there is no envelope. No other
+  command's output changes.
+- Shell completion (`completion bash|zsh|fish|powershell`) completes the
+  values of every flag with a fixed set (`--format`, `--slcan-bitrate`,
+  `--slcan-data-bitrate`, `--mtu`, `--dlc`, `--tx-dl`, `--file-format`,
+  `--addressing`, `--pattern`, `--error-frame`, `dbc convert --to`), database
+  files (`.dbc`, `.kcd`, `.arxml`) for `--dbc` and the `dbc` commands, trace
+  files by extension for `--trace`, `--output`, `replay`, `trace convert` and
+  `trace info`, and no file names for free values (interfaces, identifiers,
+  numbers, durations).
+- `make build` injects the full commit SHA and the version without the
+  leading `v`, as the Release workflow does.
+
+---
+
 ## v0.9.0
 
 **Date:** 2026-11-07
