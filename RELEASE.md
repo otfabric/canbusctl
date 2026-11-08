@@ -8,7 +8,7 @@ version as its notes. Add the section before running it.
 
 ## v0.10.0
 
-**Date:** unreleased
+**Date:** 2026-11-07
 **Previous release:** v0.9.0
 
 `version` prints one line in the format shared by every OT Fabric CLI, and
