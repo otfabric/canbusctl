@@ -33,9 +33,12 @@ Gaps and follow-ups, grouped and ordered: [ROADMAP.md](ROADMAP.md).
   groups) is dropped and printed as warnings; extended multiplexing cannot be
   written as KCD (exit 8). Environment variables and other DBC constructs
   go-canbus ignores are reported as warnings (see go-canbus LIMITATIONS.md).
-- **Traces:** candump logs keep microseconds; pcap does not keep interface
-  names or the own-message mark; ASC and BLF keep channel numbers, not
-  interface names, and no error class (`trace convert` reports each loss);
+- **Traces:** candump logs keep microseconds, and the own-message mark only
+  with `--direction` (the `R`/`T` token of `candump -L -x`); pcap does not
+  keep interface names or the own-message mark; ASC, BLF and TRC keep
+  channel numbers, not interface names (go-canbus v0.9.0: `can0` → 1,
+  `can4` → 5, a bare number as itself; a BLF channel above 65535 is refused,
+  exit 3), and no error class (`trace convert` reports each loss);
   JSON Lines is lossless. ASC, BLF and TRC times are zone-less local time
   (`TZ`). pcapng keeps interface names but, like pcap, not the
   own-message mark. MF4 is not supported. Viewing CAN XL in pcap needs

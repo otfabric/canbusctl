@@ -178,7 +178,8 @@ Global Flags:
 monitor receives frames and prints them, one line or JSON record each, until
 --count frames, --duration or Ctrl-C. It never transmits. --dbc decodes frames of
 known messages with a DBC, KCD or ARXML database. --output also writes the
-frames to a trace file (format by extension, as record). Filters use candump notation:
+frames to a trace file (format by extension, as record; --direction ends each
+candump line with R or T). Filters use candump notation:
 <id>:<mask> or <id>~<mask> (inverted), hexadecimal, with ",std", ",ext", ",rtr"
 or ",data"; several filters are ORed, or ANDed with --join.
 
@@ -188,6 +189,7 @@ Usage:
 Flags:
   -n, --count int            Stop after this many frames (0: no limit)
       --dbc string           Decode with this DBC, KCD or ARXML database
+      --direction            candump --output: end each line with R or T (received, sent by this host)
       --duration duration    Stop after this time (0: until Ctrl-C)
       --errors               Also receive error frames
       --filter stringArray   Filter <id>:<mask> (repeatable)
@@ -285,12 +287,15 @@ until --count, --duration or Ctrl-C. candump logs keep microseconds; JSON Lines
 keeps every field, including nanosecond timestamps; pcapng keeps interface
 names. --xl also records CAN XL frames (a SocketCAN interface with the CAN XL
 MTU or the virtual bus; candump, JSON Lines, pcap and pcapng only).
+--direction ends every candump line with R or T (sent by this host), as
+candump -L -x does.
 
 Usage:
   canbusctl record [flags]
 
 Flags:
   -n, --count int            Stop after this many frames
+      --direction            candump output: end each line with R or T (received, sent by this host)
       --duration duration    Stop after this time
       --errors               Also record error frames
       --file-format string   candump, jsonl, pcap, pcapng, asc, blf or trc (default: from the extension)
@@ -714,8 +719,10 @@ Use "canbusctl trace [command] --help" for more information about a command.
 convert reads <input> ("-": stdin) in any readable format and writes
 <output> in the format of its extension (or --file-format). --filter keeps
 only matching frames (candump notation, repeatable, ORed or ANDed with
---join); --no-errors drops error frames; --max-frames stops early. What the
-target format cannot keep (error class in ASC/BLF, interface names, echo
+--join); --no-errors drops error frames; --max-frames stops early.
+--direction ends every candump line with the R/T token of candump -L -x
+(T for a frame the logging node sent), so a log with tokens converts back
+unchanged. What the target format cannot keep (error class in ASC/BLF, interface names, echo
 marks, sub-microsecond times, CAN XL frames in ASC/BLF/TRC) is reported,
 never silently dropped. --filter selects CAN XL frames by priority, as the
 kernel's filters do.
@@ -724,6 +731,7 @@ Usage:
   canbusctl trace convert <input> <output> [flags]
 
 Flags:
+      --direction            candump output: end each line with R or T (received, sent by the logging node)
       --file-format string   candump, jsonl, pcap, pcapng, asc, blf or trc (default: from the extension)
       --filter stringArray   Keep frames matching <id>:<mask> (repeatable)
   -h, --help                 help for convert

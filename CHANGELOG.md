@@ -3,7 +3,13 @@
 All notable changes are listed here; release notes are in
 [RELEASE.md](RELEASE.md).
 
-## v0.10.0 (unreleased)
+## v0.11.0 (2026-11-08)
+
+go-canbus v0.9.0: ASC/BLF/TRC channels from interface numbers (`can4` → 5;
+was always 1), BLF channels above 65535 refused; `--direction` on
+`trace convert`, `record` and `monitor` writes candump R/T tokens.
+
+## v0.10.0 (2026-11-07)
 
 `version` prints the OT Fabric one-line format (`canbusctl 0.10.0 (tag
 v0.10.0, commit …, built …, go-canbus 0.8.0, go-serial 0.2.1, go…, os/arch)`);

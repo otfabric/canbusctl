@@ -124,7 +124,7 @@ func newMonitorCmd(a *app) *cobra.Command {
 		output          string
 		filters         []string
 		join, errFrames bool
-		noFD            bool
+		noFD, direction bool
 		count           int
 		duration        time.Duration
 	)
@@ -134,7 +134,8 @@ func newMonitorCmd(a *app) *cobra.Command {
 		Long: `monitor receives frames and prints them, one line or JSON record each, until
 --count frames, --duration or Ctrl-C. It never transmits. --dbc decodes frames of
 known messages with a DBC, KCD or ARXML database. --output also writes the
-frames to a trace file (format by extension, as record). Filters use candump notation:
+frames to a trace file (format by extension, as record; --direction ends each
+candump line with R or T). Filters use candump notation:
 <id>:<mask> or <id>~<mask> (inverted), hexadecimal, with ",std", ",ext", ",rtr"
 or ",data"; several filters are ORed, or ANDed with --join.`,
 		Args: cobra.NoArgs,
@@ -164,12 +165,15 @@ or ",data"; several filters are ORed, or ANDed with --join.`,
 				if err != nil {
 					return err
 				}
+				if direction && format != capture.FormatCandump {
+					return errs.Invalid("--direction applies to a candump --output, not %s", format)
+				}
 				file, err := cli.CreateOutput(output)
 				if err != nil {
 					return errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot create %s: %w", output, err)
 				}
 				defer func() { _ = file.Close() }()
-				if tw, err = capture.NewWriter(file, format); err != nil {
+				if tw, err = newTraceWriter(file, format, direction); err != nil {
 					return err
 				}
 				defer func() { _ = tw.Close() }()
@@ -213,6 +217,7 @@ or ",data"; several filters are ORed, or ANDed with --join.`,
 	f.BoolVar(&noFD, "no-fd", false, "Do not open the socket for CAN FD even when the interface carries it")
 	f.StringVar(&dbPath, "dbc", "", "Decode with this DBC, KCD or ARXML database")
 	f.StringVarP(&output, "output", "o", "", "Also write the frames to this trace file")
+	f.BoolVar(&direction, "direction", false, "candump --output: end each line with R or T (received, sent by this host)")
 	f.IntVarP(&count, "count", "n", 0, "Stop after this many frames (0: no limit)")
 	f.DurationVar(&duration, "duration", 0, "Stop after this time (0: until Ctrl-C)")
 	_ = c.MarkFlagRequired("interface")
@@ -508,7 +513,7 @@ func newRecordCmd(a *app) *cobra.Command {
 		iface, out, ff  string
 		filters         []string
 		errFrames, noFD bool
-		xl              bool
+		xl, direction   bool
 		count           int
 		duration        time.Duration
 	)
@@ -522,7 +527,9 @@ times: set TZ) or --file-format,
 until --count, --duration or Ctrl-C. candump logs keep microseconds; JSON Lines
 keeps every field, including nanosecond timestamps; pcapng keeps interface
 names. --xl also records CAN XL frames (a SocketCAN interface with the CAN XL
-MTU or the virtual bus; candump, JSON Lines, pcap and pcapng only).`,
+MTU or the virtual bus; candump, JSON Lines, pcap and pcapng only).
+--direction ends every candump line with R or T (sent by this host), as
+candump -L -x does.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			format, err := cli.TraceFormat(out, ff)
@@ -531,6 +538,9 @@ MTU or the virtual bus; candump, JSON Lines, pcap and pcapng only).`,
 			}
 			if err != nil {
 				return err
+			}
+			if direction && format != capture.FormatCandump {
+				return errs.Invalid("--direction applies to candump output, not %s", format)
 			}
 			fs, err := cli.ParseFilters(filters, false, errFrames)
 			if err != nil {
@@ -554,7 +564,7 @@ MTU or the virtual bus; candump, JSON Lines, pcap and pcapng only).`,
 				return errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot create %s: %w", out, err)
 			}
 			defer func() { _ = file.Close() }()
-			w, err := capture.NewWriter(file, format)
+			w, err := newTraceWriter(file, format, direction)
 			if err != nil {
 				return err
 			}
@@ -583,6 +593,7 @@ MTU or the virtual bus; candump, JSON Lines, pcap and pcapng only).`,
 	f.BoolVar(&errFrames, "errors", false, "Also record error frames")
 	f.BoolVar(&noFD, "no-fd", false, "Do not open the socket for CAN FD")
 	f.BoolVar(&xl, "xl", false, "Also record CAN XL frames (SocketCAN with the CAN XL MTU, or virtual)")
+	f.BoolVar(&direction, "direction", false, "candump output: end each line with R or T (received, sent by this host)")
 	f.IntVarP(&count, "count", "n", 0, "Stop after this many frames")
 	f.DurationVar(&duration, "duration", 0, "Stop after this time")
 	_ = c.MarkFlagRequired("interface")
