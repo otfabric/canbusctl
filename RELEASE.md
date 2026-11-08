@@ -6,6 +6,32 @@ with the version bump). It computes the tag, builds the binaries for linux
 publishes the GitHub release with the section of this file that matches the
 version as its notes. Add the section before running it.
 
+## v0.11.0
+
+**Date:** 2026-11-08
+**Previous release:** v0.10.0
+
+Built on go-canbus v0.9.0, which go-canbus tests against CAN logs recorded on
+twelve real vehicles. Two of its fixes reach canbusctl's trace output.
+
+- **Channel numbers in ASC, BLF and TRC changed.** `trace convert`, `record`
+  and `monitor --output` used to write every interface that is not a bare
+  number as channel 1, so a recording of several buses collapsed into one
+  channel. Now `can0` is channel 1, `can4` channel 5, `vcan2` channel 3; a bare
+  number stays itself, any other name is 1. Scripts that read channel 1 for
+  `can1` frames must read channel 2. `trace convert` still reports each
+  interface name it turns into a number (now also `0`, written as 1).
+- **A BLF channel above 65535 is refused** (exit 3, `unrepresentable_frame`)
+  instead of being written as channel 1 and reported as a loss.
+- **`--direction`** (new flag of `trace convert`, `record` and `monitor`): a
+  candump output ends every line with `R` or `T` (sent by the logging node),
+  as `candump -L -x` writes it. A log with tokens now converts back to
+  itself; without the flag `trace convert` still reports the lost `T` marks.
+  With an output that is not candump it is an error (exit 3).
+- `version` reports go-canbus 0.9.0.
+
+---
+
 ## v0.10.0
 
 **Date:** 2026-11-07

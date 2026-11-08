@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -66,6 +65,7 @@ func (r convertResult) Text() string {
 // losses tracks what the target format cannot keep.
 type losses struct {
 	errorClass, iface, echo, subMicro, xl int
+	direction                             bool // candump written with R/T tokens
 }
 
 func (l *losses) note(f *canbus.Frame, format capture.Format) {
@@ -78,13 +78,13 @@ func (l *losses) note(f *canbus.Frame, format capture.Format) {
 				l.errorClass++
 			}
 		}
-		if n, err := strconv.Atoi(f.Interface); f.Interface != "" && err != nil {
+		// A channel number is kept; anything else becomes one (go-canbus
+		// v0.9.0: can0 → 1, can4 → 5, other names and 0 → 1).
+		if n, err := strconv.Atoi(f.Interface); f.Interface != "" && (err != nil || n < 1 || strconv.Itoa(n) != f.Interface) {
 			l.iface++
-		} else if format == capture.FormatBLF && f.Interface != "" && (n < 1 || n > math.MaxUint16) {
-			l.iface++ // go-canbus writes channel 1 for a number its 16-bit field cannot hold
 		}
 	case capture.FormatCandump:
-		if f.Echo {
+		if f.Echo && !l.direction {
 			l.echo++
 		}
 		if f.Timestamp.Nanosecond()%1000 != 0 {
@@ -128,8 +128,8 @@ func (l *losses) list() []string {
 		}
 	}
 	add(l.errorClass, "error class (ASC/BLF carry none, TRC only protocol violations and counters; read back as protocol errors)")
-	add(l.iface, "interface name (ASC/BLF/TRC keep channel numbers, pcap none)")
-	add(l.echo, "own-transmission (echo) mark")
+	add(l.iface, "interface name (ASC/BLF/TRC keep channel numbers: can0 → 1, can4 → 5; pcap none)")
+	add(l.echo, "own-transmission (echo) mark (candump keeps it with --direction)")
 	add(l.subMicro, "timestamp below microseconds")
 	add(l.xl, "CAN XL, not written (ASC, BLF and TRC cannot carry CAN XL)")
 	return out
@@ -141,6 +141,7 @@ func newTraceConvertCmd(a *app) *cobra.Command {
 		filters   []string
 		join      bool
 		noErrors  bool
+		direction bool
 		maxFrames int
 	)
 	c := &cobra.Command{
@@ -149,8 +150,10 @@ func newTraceConvertCmd(a *app) *cobra.Command {
 		Long: `convert reads <input> ("-": stdin) in any readable format and writes
 <output> in the format of its extension (or --file-format). --filter keeps
 only matching frames (candump notation, repeatable, ORed or ANDed with
---join); --no-errors drops error frames; --max-frames stops early. What the
-target format cannot keep (error class in ASC/BLF, interface names, echo
+--join); --no-errors drops error frames; --max-frames stops early.
+--direction ends every candump line with the R/T token of candump -L -x
+(T for a frame the logging node sent), so a log with tokens converts back
+unchanged. What the target format cannot keep (error class in ASC/BLF, interface names, echo
 marks, sub-microsecond times, CAN XL frames in ASC/BLF/TRC) is reported,
 never silently dropped. --filter selects CAN XL frames by priority, as the
 kernel's filters do.`,
@@ -159,6 +162,9 @@ kernel's filters do.`,
 			format, err := cli.TraceFormat(args[1], ff)
 			if err != nil {
 				return err
+			}
+			if direction && format != capture.FormatCandump {
+				return errs.Invalid("--direction applies to candump output, not %s", format)
 			}
 			var fs *canbus.FilterSet
 			if len(filters) > 0 {
@@ -187,12 +193,12 @@ kernel's filters do.`,
 					cli.RemovePartial(args[1])
 				}
 			}()
-			w, err := capture.NewWriter(file, format)
+			w, err := newTraceWriter(file, format, direction)
 			if err != nil {
 				return err
 			}
 			res := convertResult{Input: args[0], Output: args[1], Format: string(format)}
-			var lost losses
+			lost := losses{direction: direction}
 			xr, _ := r.(capture.XLReader)
 			xw, _ := w.(capture.XLWriter)
 			var x canbus.XLFrame
@@ -252,8 +258,22 @@ kernel's filters do.`,
 	f.StringArrayVar(&filters, "filter", nil, "Keep frames matching <id>:<mask> (repeatable)")
 	f.BoolVar(&join, "join", false, "A frame must pass all filters")
 	f.BoolVar(&noErrors, "no-errors", false, "Drop error frames")
+	f.BoolVar(&direction, "direction", false, "candump output: end each line with R or T (received, sent by the logging node)")
 	f.IntVar(&maxFrames, "max-frames", 0, "Stop after writing this many frames (0: all)")
 	return c
+}
+
+// newTraceWriter returns a writer of format; direction makes a candump
+// writer write the R/T token of candump -L -x.
+func newTraceWriter(w io.Writer, format capture.Format, direction bool) (capture.Writer, error) {
+	tw, err := capture.NewWriter(w, format)
+	if err != nil {
+		return nil, err
+	}
+	if cw, ok := tw.(*capture.CandumpWriter); ok {
+		cw.SetDirection(direction)
+	}
+	return tw, nil
 }
 
 type traceID struct {

@@ -73,11 +73,16 @@ func TestTraceConvertUnrepresentable(t *testing.T) {
 	r := run(t, "", "trace", "convert", fd, filepath.Join(dir, "fd.blf"))
 	want(t, r, 3, "BLF CAN FD channel 300")
 	noFile(t, filepath.Join(dir, "fd.blf"))
-	// Classical frames have 16 bits; a channel beyond them becomes 1, which
-	// is reported as a loss.
-	ch := writeFile(t, "ch.log", "(1700000000.000000) 70000 123#11\n(1700000000.000000) 0 124#11\n(1700000000.000000) 300 125#11\n")
+	// Classical frames have 16 bits: since go-canbus v0.9.0 a channel beyond
+	// them is refused (it used to become channel 1).
+	big := writeFile(t, "big.log", "(1700000000.000000) 70000 123#11\n")
+	want(t, run(t, "", "trace", "convert", big, filepath.Join(dir, "big.blf")), 3, "BLF channel 70000")
+	noFile(t, filepath.Join(dir, "big.blf"))
+	// Channel 0 and names become channel numbers, reported as a loss;
+	// 300 and 70000 are kept where the format holds them.
+	ch := writeFile(t, "ch.log", "(1700000000.000000) 0 124#11\n(1700000000.000000) 300 125#11\n(1700000000.000000) can4 126#11\n")
 	want(t, run(t, "", "trace", "convert", ch, filepath.Join(dir, "ch.blf")), 0, "3 written", "lost: 2 frames: interface name")
-	want(t, run(t, "", "trace", "convert", ch, filepath.Join(dir, "ch.asc")), 0, "3 written")
+	want(t, run(t, "", "trace", "convert", big, filepath.Join(dir, "ch.asc")), 0, "1 written")
 }
 
 // TestTraceOutOfRangeTimestamps: readers of go-canbus v0.8.0 reject
