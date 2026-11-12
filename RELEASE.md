@@ -6,6 +6,21 @@ with the version bump). It computes the tag, builds the binaries for linux
 publishes the GitHub release with the section of this file that matches the
 version as its notes. Add the section before running it.
 
+## v0.11.1
+
+**Date:** 2026-11-12
+**Previous release:** v0.11.0
+
+Dependency update; no change to canbusctl's own code.
+
+- go-canbus v0.9.1 (from v0.9.0) and go-serial v0.3.0 (from v0.2.1).
+  go-serial now refuses out-of-range serial parameters (data and stop
+  bits, RS-485 RTS delays above `serial.MaxRS485Delay`) instead of
+  wrapping them; this reaches the slcan transport (`-i slcan:<device>`).
+- `version` reports go-canbus 0.9.1.
+
+---
+
 ## v0.11.0
 
 **Date:** 2026-11-08
