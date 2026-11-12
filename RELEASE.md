@@ -8,7 +8,7 @@ version as its notes. Add the section before running it.
 
 ## v0.11.1
 
-**Date:** 2026-11-12
+**Date:** 2026-11-13
 **Previous release:** v0.11.0
 
 Dependency update; no change to canbusctl's own code.
