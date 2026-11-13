@@ -3,6 +3,11 @@
 All notable changes are listed here; release notes are in
 [RELEASE.md](RELEASE.md).
 
+## v0.11.2 (2026-11-13)
+
+Interop suite pinned to canbus-interop v0.7.0 (contract 1.4): 88 passed,
+0 failed, 6 skipped, 76 known differences on amd64 and arm64.
+
 ## v0.11.0 (2026-11-08)
 
 go-canbus v0.9.0: ASC/BLF/TRC channels from interface numbers (`can4` → 5;

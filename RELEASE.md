@@ -6,6 +6,22 @@ with the version bump). It computes the tag, builds the binaries for linux
 publishes the GitHub release with the section of this file that matches the
 version as its notes. Add the section before running it.
 
+## v0.11.2
+
+**Date:** 2026-11-13
+**Previous release:** v0.11.1
+
+Interop pin update; no change to canbusctl's own code.
+
+- The interop suite pins the canbus-interop v0.7.0 images by digest (was
+  v0.6.0), the same as go-canbus v0.9.1. Contract 1.4 adds only the
+  version document's `independentEngine` field and no scenario.
+- Interop against canbus-interop v0.7.0 (CI, amd64 and arm64): 88 passed,
+  0 failed, 6 skipped, 76 known-difference records (unchanged from
+  v0.6.0).
+
+---
+
 ## v0.11.1
 
 **Date:** 2026-11-13
