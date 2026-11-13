@@ -86,6 +86,11 @@ and mainline 6.1, 6.6, 6.12 and 6.18 (`scripts/microvm-test.sh`).
 GitHub's hosted runners lack (the kernel ISO-TP test skips there and runs in
 local Linux VMs).
 
+**Interop at the time of v0.11.2** (CI Interop workflow, amd64 and arm64,
+2026-11-13, canbus-interop v0.7.0 images, contract 1.4): 88 pass, 0 fail,
+6 skips (CAN XL capabilities the stacks lack), 76 known differences, the
+same as with v0.6.0.
+
 **At the time of v0.3.0** (same VM, canbus-interop v0.3.0 images): interop
 84 pass, 27 known differences, no skips (`record` .trc read by python-can
 added); the end-to-end test against the kernel's slcan driver
