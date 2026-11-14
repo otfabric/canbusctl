@@ -6,6 +6,35 @@ with the version bump). It computes the tag, builds the binaries for linux
 publishes the GitHub release with the section of this file that matches the
 version as its notes. Add the section before running it.
 
+## v0.12.0
+
+**Date:** 2026-11-14
+**Previous release:** v0.11.2
+
+Built on go-canbus v0.10.0 (input bounds and output encoding).
+
+- `dbc convert --to dbc`: a KCD or ARXML name that is not a DBC identifier
+  (or a node or receiver name that is a DBC keyword) now fails with exit 3,
+  code `invalid_database`, and nothing is written. Before, it was written
+  as it was and could change the meaning of the DBC output.
+- `dbc generate`: generated comments replace line terminators and control
+  characters, and names in error messages are quoted string literals; the
+  generator reports `go-canbus codegen 2`.
+- `trace convert` to candump: interface names containing a space, control
+  byte or DEL are refused as `unrepresentable_frame` (exit 3).
+- KCD LabelGroups, ARXML text tables and ARXML references are bounded
+  (go-canbus LIMITATIONS.md); DBC, KCD and ARXML parsing and validation
+  take time roughly linear in the file size; two DBC inputs that ended the
+  process now report diagnostics.
+- `isotp` commands (userspace): flow controls that arrive while the sender
+  is not waiting for one are ignored. `--kernel`: `--max-size` above
+  1025 KiB is refused (exit 3).
+- `-i slcan:` over TCP: `send` honours its timeout during the write, and
+  closing never waits on an adapter that stopped reading.
+- `version` reports go-canbus 0.10.0.
+
+---
+
 ## v0.11.2
 
 **Date:** 2026-11-13

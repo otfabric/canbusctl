@@ -123,4 +123,11 @@ func TestDBCGenerateAndConvert(t *testing.T) {
 	want(t, run(t, "", "dbc", "convert", vehicle, "--to", "arxml"), 8, "not supported")
 	want(t, run(t, "", "dbc", "convert", vehicle), 2, "to")
 	want(t, run(t, "", "dbc", "convert", "testdata/missing.dbc", "--to", "dbc"), 3)
+	// A KCD name that is not a DBC identifier cannot be written as DBC.
+	badName := filepath.Join(t.TempDir(), "name.kcd")
+	if err := os.WriteFile(badName, []byte(`<NetworkDefinition><Bus><Message id="0x10" name="M N" length="8"><Signal name="S" offset="0" length="8"/></Message></Bus></NetworkDefinition>`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	want(t, run(t, "", "dbc", "convert", badName, "--to", "dbc"), 3, "not a DBC identifier")
+	want(t, run(t, "", "--format", "json", "dbc", "convert", badName, "--to", "dbc"), 3, `"invalid_database"`)
 }
