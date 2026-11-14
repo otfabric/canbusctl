@@ -12,6 +12,7 @@ import (
 	"github.com/otfabric/go-canbus"
 	"github.com/otfabric/go-canbus/candb"
 	"github.com/otfabric/go-canbus/capture"
+	"github.com/otfabric/go-canbus/dbc"
 	"github.com/otfabric/go-canbus/isotp"
 )
 
@@ -150,6 +151,8 @@ func Classify(err error) *Error {
 		return mk(KindInvalidInput, CodeUnrepresentable)
 	case isParseError(err):
 		return mk(KindInvalidInput, CodeInvalidCapture)
+	case errors.Is(err, dbc.ErrName): // a KCD/ARXML name DBC cannot carry
+		return mk(KindInvalidInput, CodeInvalidDatabase)
 	case errors.Is(err, candb.ErrLayout): // a database the parser accepted with a signal layout the codec refuses
 		return mk(KindInvalidInput, CodeInvalidDatabase)
 	case errors.Is(err, candb.ErrRange), errors.Is(err, candb.ErrUnknownSignal), errors.Is(err, candb.ErrMissingSignal),
