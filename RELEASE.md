@@ -6,6 +6,18 @@ with the version bump). It computes the tag, builds the binaries for linux
 publishes the GitHub release with the section of this file that matches the
 version as its notes. Add the section before running it.
 
+## v0.13.1
+
+**Date:** 2026-11-15
+**Previous release:** v0.13.0
+
+### Changed
+
+- Built on go-canbus v0.11.0 (was v0.10.1).
+- `isotp send --kernel`: on kernels with ISO-TP poll support (mainline 6.3 and later, and the stable kernels that carry it), a send that a receiver keeps waiting with flow control now ends at `--timeout`, and the command exits promptly when interrupted. On older kernels the transfer still runs to its end, as before.
+
+---
+
 ## v0.13.0
 
 **Date:** 2026-11-15
