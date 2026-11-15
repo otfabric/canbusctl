@@ -12,6 +12,8 @@ never transmit. Commands that transmit (send, send-fd, xl send, replay, isotp
 send, simulate, inject)
 need --yes on any interface that is not virtual (vcan, vxcan or the in-process
 bus "virtual"), and are bounded by --rate, --max-frames and --duration.
+isotp receive sends only the flow control frames of an ISO-TP receiver, on
+any interface and without --yes; isotp monitor sends nothing.
 
 SocketCAN interfaces exist on Linux only; on macOS and Windows the database,
 trace and virtual-bus commands work and interface commands exit 8.
@@ -349,7 +351,10 @@ Global Flags:
 ## canbusctl stats
 
 ```text
-Show interface counters and, with --duration, count live traffic per identifier (passive)
+stats prints the counters of an interface (Linux) and, with --duration, receives
+for that long and counts the frames and rate of each identifier. It never
+transmits. At most 65536 identifiers are listed; the frames of further
+identifiers are counted together (otherFrames).
 
 Usage:
   canbusctl stats [flags]
@@ -749,7 +754,10 @@ Global Flags:
 ## canbusctl trace info
 
 ```text
-Summarize a trace: frames, duration, kinds, per-identifier counts and rates
+info reads a trace ("-": stdin) and reports its frames, duration and kinds,
+and the frames, rate and lengths of each identifier (CAN XL frames by VCID and
+priority). At most 65536 identifiers are listed; the frames of further
+identifiers are counted together (otherFrames).
 
 Usage:
   canbusctl trace info <file> [flags]
@@ -770,6 +778,8 @@ Global Flags:
 simulate sends the messages of a DBC, KCD or ARXML database at their cycle times
 (GenMsgCycleTime / interval; --default-cycle for the others) with signal values
 from --pattern: counter (the step number), random (seeded by --seed) or initial.
+A cycle time above 1 hour, or below 0, is ignored with a warning: the message is
+then treated as one without a cycle time.
 The same seed and database give the same frames. With --interface virtual the
 traffic stays in this process and is printed; on a vcan or vxcan interface it
 is sent; on any other interface it needs --yes. --duration (default 10s),
@@ -813,7 +823,8 @@ a seeded fault stage (the chaos bridge of go-canbus, as in "bridge") —
                        --malformed N (frames violating the length rules)
                        are injected there too.
   vcan / vxcan         the surviving frames are transmitted, faults applied in
-                       userspace before sending. Error frames and malformed
+                       userspace before sending, at most --max-frames of
+                       them (duplicates included). Error frames and malformed
                        frames cannot be sent through SocketCAN (exit 8).
   other interfaces     refused without --yes.
 

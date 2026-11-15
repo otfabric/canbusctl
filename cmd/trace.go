@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/otfabric/canbusctl/internal/cli"
 	"github.com/otfabric/canbusctl/internal/errs"
+	"github.com/otfabric/canbusctl/internal/output"
 	"github.com/otfabric/go-canbus"
 	"github.com/otfabric/go-canbus/capture"
 	"github.com/spf13/cobra"
@@ -259,7 +261,7 @@ kernel's filters do.`,
 	f.BoolVar(&join, "join", false, "A frame must pass all filters")
 	f.BoolVar(&noErrors, "no-errors", false, "Drop error frames")
 	f.BoolVar(&direction, "direction", false, "candump output: end each line with R or T (received, sent by the logging node)")
-	f.IntVar(&maxFrames, "max-frames", 0, "Stop after writing this many frames (0: all)")
+	intVar(f, &maxFrames, "max-frames", "", 0, "Stop after writing this many frames (0: all)")
 	return c
 }
 
@@ -274,6 +276,30 @@ func newTraceWriter(w io.Writer, format capture.Format, direction bool) (capture
 		cw.SetDirection(direction)
 	}
 	return tw, nil
+}
+
+// traceOutput is the trace file of monitor -o, record and xl monitor -o.
+// close flushes the writer (the buffered formats write their tail then)
+// and closes the file, once; a failure of either is an output failure
+// (exit 10).
+type traceOutput struct {
+	path   string
+	w      io.Closer
+	file   *os.File
+	closed bool
+}
+
+func (o *traceOutput) close() error {
+	if o == nil || o.closed {
+		return nil
+	}
+	o.closed = true
+	werr := o.w.Close()
+	ferr := o.file.Close()
+	if err := cmp.Or(werr, ferr); err != nil {
+		return errs.New(errs.KindOutput, errs.CodeOutputFailed, "write %s: %w", o.path, err)
+	}
+	return nil
 }
 
 type traceID struct {
@@ -298,6 +324,9 @@ type traceInfo struct {
 	Errors    int       `json:"errors"`
 	Extended  int       `json:"extended"`
 	IDs       []traceID `json:"ids"`
+	// OtherFrames counts the frames of identifiers not listed in IDs,
+	// which holds at most maxDistinctIDs identifiers.
+	OtherFrames int `json:"otherFrames"`
 }
 
 func (r traceInfo) Text() string {
@@ -309,6 +338,9 @@ func (r traceInfo) Text() string {
 	fmt.Fprintf(&b, "\n  classical %d, CAN FD %d, CAN XL %d, remote %d, error %d; extended identifiers %d\n", r.Classical, r.FD, r.XL, r.Remote, r.Errors, r.Extended)
 	for _, id := range r.IDs {
 		fmt.Fprintf(&b, "  %-9s %7d frames  %9.2f Hz  len %d..%d\n", id.ID, id.Frames, id.RateHz, id.MinLen, id.MaxLen)
+	}
+	if r.OtherFrames > 0 {
+		b.WriteString("  " + otherFramesText(uint64(r.OtherFrames)) + "\n")
 	}
 	return strings.TrimRight(b.String(), "\n")
 }
@@ -340,7 +372,11 @@ func newTraceInfoCmd(a *app) *cobra.Command {
 	return &cobra.Command{
 		Use:   "info <file>",
 		Short: "Summarize a trace: frames, duration, kinds, per-identifier counts and rates",
-		Args:  cobra.ExactArgs(1),
+		Long: `info reads a trace ("-": stdin) and reports its frames, duration and kinds,
+and the frames, rate and lengths of each identifier (CAN XL frames by VCID and
+priority). At most 65536 identifiers are listed; the frames of further
+identifiers are counted together (otherFrames).`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			path := args[0]
 			var src *os.File
@@ -379,6 +415,10 @@ func newTraceInfoCmd(a *app) *cobra.Command {
 			count := func(k string, n int) {
 				s := ids[k]
 				if s == nil {
+					if len(ids) >= idLimit {
+						res.OtherFrames++
+						return
+					}
 					s = &traceID{ID: k, MinLen: n, MaxLen: n}
 					ids[k] = s
 				}
@@ -436,6 +476,9 @@ func newTraceInfoCmd(a *app) *cobra.Command {
 				res.IDs = append(res.IDs, *s)
 			}
 			sort.Slice(res.IDs, func(i, j int) bool { return res.IDs[i].ID < res.IDs[j].ID })
+			if a.format == output.Table && res.OtherFrames > 0 {
+				a.warn("%s", otherFramesText(uint64(res.OtherFrames)))
+			}
 			return a.emit("trace info", res)
 		},
 	}

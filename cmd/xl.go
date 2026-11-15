@@ -13,6 +13,7 @@ import (
 
 	"github.com/otfabric/canbusctl/internal/cli"
 	"github.com/otfabric/canbusctl/internal/errs"
+	"github.com/otfabric/canbusctl/internal/output"
 	"github.com/otfabric/go-canbus"
 	"github.com/otfabric/go-canbus/capture"
 )
@@ -44,9 +45,10 @@ func toXLJSON(x *canbus.XLFrame) xlJSON {
 	return j
 }
 
-// xlLine is the text form of a received CAN XL frame (candump -L style).
+// xlLine is the text form of a received CAN XL frame (candump -L style),
+// its interface name escaped.
 func xlLine(x *canbus.XLFrame) string {
-	iface := x.Interface
+	iface := output.Escape(x.Interface)
 	if iface == "" {
 		iface = "-"
 	}
@@ -210,7 +212,7 @@ interface that is not vcan or vxcan nothing is sent without --yes.`,
 	fl := c.Flags()
 	fl.StringVarP(&iface, "interface", "i", "", "SocketCAN interface with the CAN XL MTU, or \"virtual\" (required)")
 	fl.BoolVar(&yes, "yes", false, "Confirm transmission on a non-virtual interface")
-	fl.IntVar(&repeat, "repeat", 1, "Send the frames this many times")
+	intVar(fl, &repeat, "repeat", "", 1, "Send the frames this many times")
 	fl.DurationVar(&gap, "gap", 0, "Pause between frames")
 	addLimitFlags(c, &limits, 0)
 	_ = c.MarkFlagRequired("interface")
@@ -233,27 +235,36 @@ Lines (.jsonl), pcap or pcapng (Wireshark) trace, the formats that carry CAN
 XL.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			var tw capture.XLWriter
+			var format capture.Format
 			if output != "" {
-				format, err := xlFormat(output, "")
+				f, err := xlFormat(output, "")
 				if err != nil {
 					return err
 				}
-				file, err := cli.CreateOutput(output)
-				if err != nil {
-					return errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot create %s: %w", output, err)
-				}
-				defer func() { _ = file.Close() }()
-				if tw, err = newXLWriter(file, format); err != nil {
-					return err
-				}
-				defer func() { _ = tw.Close() }()
+				format = f
 			}
+			// The interface first: an existing output is truncated only
+			// once there is something to record.
 			conn, err := openXL(iface, false)
 			if err != nil {
 				return err
 			}
 			defer func() { _ = conn.Close() }()
+			var tw capture.XLWriter
+			var out *traceOutput
+			if output != "" {
+				file, err := cli.CreateOutput(output)
+				if err != nil {
+					return errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot create %s: %w", output, err)
+				}
+				if tw, err = newXLWriter(file, format); err != nil {
+					_ = file.Close()
+					return err
+				}
+				out = &traceOutput{path: output, w: tw, file: file}
+				defer func() { _ = out.close() }()
+			}
+			ready("xl monitor")
 			ctx, cancel := bounded(cmd.Context(), duration)
 			defer cancel()
 			st := a.stream()
@@ -291,6 +302,9 @@ XL.`,
 				}
 				n++
 			}
+			if err := out.close(); err != nil {
+				return err
+			}
 			s := xlSummary{Frames: n, XL: xls}
 			if st, ok := any(conn).(canbus.Statser); ok {
 				s.Dropped = st.Stats().Dropped
@@ -305,7 +319,7 @@ XL.`,
 	fl := c.Flags()
 	fl.StringVarP(&iface, "interface", "i", "", "SocketCAN interface with the CAN XL MTU, or \"virtual\" (required)")
 	fl.StringVarP(&output, "output", "o", "", "Also write the frames to this trace file (.log, .jsonl, .pcap or .pcapng)")
-	fl.IntVarP(&count, "count", "n", 0, "Stop after this many frames (0: no limit)")
+	intVar(fl, &count, "count", "n", 0, "Stop after this many frames (0: no limit)")
 	fl.DurationVar(&duration, "duration", 0, "Stop after this time (0: until Ctrl-C)")
 	_ = c.MarkFlagRequired("interface")
 	return c

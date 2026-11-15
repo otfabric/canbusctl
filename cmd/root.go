@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync/atomic"
 	"syscall"
 
 	"github.com/otfabric/canbusctl/internal/buildinfo"
@@ -34,6 +35,19 @@ type app struct {
 	errOut  io.Writer
 	format  output.Format
 	started bool // RunE was reached: flags parsed
+}
+
+// readyHook, when set, is called with a command's name once the command
+// has opened its interface and waits: for frames (the receiving commands)
+// or, in inject, for the fault stage that holds every source frame. Tests
+// set it to synchronise without sleeping; it is nil otherwise.
+var readyHook atomic.Pointer[func(string)]
+
+// ready calls readyHook.
+func ready(what string) {
+	if h := readyHook.Load(); h != nil {
+		(*h)(what)
+	}
 }
 
 // formatEnv returns the default of --format from the environment:
@@ -84,6 +98,8 @@ never transmit. Commands that transmit (send, send-fd, xl send, replay, isotp
 send, simulate, inject)
 need --yes on any interface that is not virtual (vcan, vxcan or the in-process
 bus "virtual"), and are bounded by --rate, --max-frames and --duration.
+isotp receive sends only the flow control frames of an ISO-TP receiver, on
+any interface and without --yes; isotp monitor sends nothing.
 
 SocketCAN interfaces exist on Linux only; on macOS and Windows the database,
 trace and virtual-bus commands work and interface commands exit 8.
@@ -124,9 +140,9 @@ and diagnostics go to stderr. Exit codes: docs/exitcodes.md.`,
 	_ = root.RegisterFlagCompletionFunc("format", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 		return []string{"text\thuman-readable", "json\tversioned JSON", "table\taligned columns"}, cobra.ShellCompDirectiveNoFileComp
 	})
-	root.PersistentFlags().Int("slcan-bitrate", 500000, "Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's)")
-	root.PersistentFlags().Int("slcan-data-bitrate", 0, "CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none")
-	root.PersistentFlags().Int("slcan-baud", 115200, "Serial baud rate of an slcan adapter (USB adapters ignore it)")
+	intVar(root.PersistentFlags(), new(int), "slcan-bitrate", "", 500000, "Bit rate an slcan:<device> adapter is opened with (0: keep the adapter's)")
+	intVar(root.PersistentFlags(), new(int), "slcan-data-bitrate", "", 0, "CAN FD data bit rate of an slcan adapter: 2000000 or 5000000 (CANable 2.0); 0 sends none")
+	intVar(root.PersistentFlags(), new(int), "slcan-baud", "", 115200, "Serial baud rate of an slcan adapter (USB adapters ignore it)")
 	root.AddCommand(
 		newInterfacesCmd(a), newInfoCmd(a), newConfigureCmd(a), newUpDownCmd(a, true), newUpDownCmd(a, false),
 		newMonitorCmd(a), newSendCmd(a, false), newSendCmd(a, true), newRecordCmd(a), newReplayCmd(a), newStatsCmd(a),

@@ -4,19 +4,18 @@ package cmd
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"go/token"
 	"io"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/otfabric/canbusctl/internal/cli"
 	"github.com/otfabric/canbusctl/internal/errs"
+	"github.com/otfabric/canbusctl/internal/output"
 	"github.com/otfabric/go-canbus"
 	"github.com/otfabric/go-canbus/candb"
 	"github.com/otfabric/go-canbus/codegen"
@@ -71,7 +70,7 @@ func idHex(id canbus.ID, ext bool) string {
 func (r inspectResult) Text() string {
 	var b strings.Builder
 	if m := r.Message; m != nil {
-		fmt.Fprintf(&b, "%s  id %s  %d bytes", m.Name, idHex(m.ID, m.Extended), m.Length)
+		fmt.Fprintf(&b, "%s  id %s  %d bytes", output.Escape(m.Name), idHex(m.ID, m.Extended), m.Length)
 		if m.FD {
 			b.WriteString("  CAN FD")
 		}
@@ -87,12 +86,12 @@ func (r inspectResult) Text() string {
 			if s.Signed {
 				sign = "signed"
 			}
-			fmt.Fprintf(&b, "  %-20s bit %3d len %2d %-13s %-8s ×%s %s %s", s.Name, s.StartBit, s.Length, s.ByteOrder, sign, human(s.Factor), signed(s.Offset), s.Unit)
+			fmt.Fprintf(&b, "  %-20s bit %3d len %2d %-13s %-8s ×%s %s %s", output.Escape(s.Name), s.StartBit, s.Length, s.ByteOrder, sign, human(s.Factor), signed(s.Offset), output.Escape(s.Unit))
 			if s.IsMultiplexer {
 				b.WriteString(" [multiplexer]")
 			}
 			if s.Multiplexer != "" {
-				fmt.Fprintf(&b, " [when %s in %v]", s.Multiplexer, s.MuxValues)
+				fmt.Fprintf(&b, " [when %s in %v]", output.Escape(s.Multiplexer), s.MuxValues)
 			}
 			b.WriteString("\n")
 		}
@@ -100,7 +99,7 @@ func (r inspectResult) Text() string {
 	}
 	fmt.Fprintf(&b, "%s (%s): %d messages, %d nodes\n", r.Database, r.Format, len(r.Messages), len(r.Nodes))
 	for _, m := range r.Messages {
-		fmt.Fprintf(&b, "  %-9s %-28s %2d bytes %3d signals", m.IDHex, m.Name, m.Length, m.Signals)
+		fmt.Fprintf(&b, "  %-9s %-28s %2d bytes %3d signals", m.IDHex, output.Escape(m.Name), m.Length, m.Signals)
 		if m.FD {
 			b.WriteString(" FD")
 		}
@@ -425,15 +424,11 @@ github.com/otfabric/go-canbus. --json writes the format-independent JSON
 descriptor instead.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			src, err := os.ReadFile(args[0])
-			if err != nil {
-				return errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot read database: %w", err)
-			}
-			db, _, _, err := cli.LoadDatabase(args[0])
+			// One bounded read gives the database and the SHA-256 of the file.
+			db, _, _, sum, err := cli.LoadDatabaseSum(args[0])
 			if err != nil {
 				return err
 			}
-			sum := sha256.Sum256(src)
 			if pkg == "" {
 				pkg = goPackageName(args[0])
 			}

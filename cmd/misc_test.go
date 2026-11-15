@@ -52,6 +52,16 @@ func TestInterfacesOffLinux(t *testing.T) {
 func TestConfigureValidation(t *testing.T) {
 	want(t, run(t, "", "configure", "vcan0"), 3, "nothing to configure")
 	want(t, run(t, "", "configure", "vcan0", "--sample-point", "120"), 3, "percentage")
+	// NaN and the infinities are not percentages: NaN passed the range
+	// check and reached the --yes check (exit 13).
+	for _, flag := range []string{"--sample-point", "--dsample-point"} {
+		for _, v := range []string{"NaN", "nan", "+Inf", "Inf", "-Inf", "100", "-0.1", "100.1"} {
+			want(t, run(t, "", "configure", "vcan0", flag, v), 3, flag[2:]+" ", "percentage between 0 and 100")
+		}
+		for _, v := range []string{"0.1", "87.5", "99.9"} {
+			want(t, run(t, "", "configure", "vcan0", flag, v), 13)
+		}
+	}
 	want(t, run(t, "", "configure", "vcan0", "--mtu", "50"), 3, "--mtu")
 	r := run(t, "", "configure", "vcan0", "--fd", "--listen-only=false", "--dbitrate", "2000000", "--dsample-point", "75", "--restart-ms", "100", "--one-shot", "--berr-reporting", "--loopback")
 	want(t, r, 13)

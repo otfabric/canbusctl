@@ -295,8 +295,9 @@ func TestTransmitBounds(t *testing.T) {
 		want(t, run(t, "", append(append([]string{}, c...), "--rate", "0", "--max-frames", "0")...), 0)
 	}
 	// 2^62 × 2 frames is 2^63: it wrapped negative and passed --max-frames.
-	want(t, run(t, "", "send", "-i", "virtual", "--repeat", "4611686018427387904", "123#00", "123#00"), 3, "exceed --max-frames 10000")
-	want(t, run(t, "", "xl", "send", "-i", "virtual", "--repeat", "4611686018427387904", "123#80:00:00000000#00", "123#80:00:00000000#00"), 3, "exceed --max-frames")
+	// (2^62 is beyond 32 bits: a 32-bit platform refuses it, exit 2.)
+	wantWide(t, run(t, "", "send", "-i", "virtual", "--repeat", "4611686018427387904", "123#00", "123#00"), 3, "exceed --max-frames 10000")
+	wantWide(t, run(t, "", "xl", "send", "-i", "virtual", "--repeat", "4611686018427387904", "123#80:00:00000000#00", "123#80:00:00000000#00"), 3, "exceed --max-frames")
 	want(t, run(t, "", "send", "-i", "virtual", "--repeat", "5000", "123#00", "123#00"), 0, "sent 10000 frame(s)")
 	want(t, run(t, "", "send", "-i", "virtual", "--repeat", "5001", "123#00", "123#00"), 3, "exceed --max-frames 10000")
 	// A tiny --rate is a long interval, not "no limit" (the float to
@@ -317,8 +318,8 @@ func TestTransmitBounds(t *testing.T) {
 	// (it exhausted memory first); the exit code is that of Send's own
 	// refusal (6, ErrTooLarge).
 	began := time.Now()
-	want(t, run(t, "", "isotp", "send", "-i", "virtual", "--tx-id", "7E0", "--rx-id", "7E8", "--size", "900000000000"), 6, "at most 4095")
-	want(t, run(t, "", "isotp", "send", "-i", "virtual", "--tx-id", "7E0", "--rx-id", "7E8", "--size", "900000000000", "--max-size", "99999999999"), 6, "at most 4294967295")
+	wantWide(t, run(t, "", "isotp", "send", "-i", "virtual", "--tx-id", "7E0", "--rx-id", "7E8", "--size", "900000000000"), 6, "at most 4095")
+	wantWide(t, run(t, "", "isotp", "send", "-i", "virtual", "--tx-id", "7E0", "--rx-id", "7E8", "--size", "900000000000", "--max-size", "99999999999"), 6, "at most 4294967295")
 	want(t, run(t, "", "isotp", "send", "-i", "virtual", "--tx-id", "7E0", "--rx-id", "7E8", "--size", "5000", "--max-size", "1000"), 6, "at most 1000")
 	if el := time.Since(began); el > 5*time.Second {
 		t.Fatalf("refusals took %v", el)

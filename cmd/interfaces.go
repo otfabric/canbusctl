@@ -217,7 +217,7 @@ capability. Nothing is changed without --yes.`,
 				n   string
 			}{{sample, &cfg.SamplePoint, "sample-point"}, {dsample, &cfg.DataSamplePoint, "dsample-point"}} {
 				if sp.v != 0 {
-					if sp.v <= 0 || sp.v >= 100 {
+					if !(sp.v > 0 && sp.v < 100) { // NaN and infinities are refused too
 						return errs.Invalid("--%s %v: a percentage between 0 and 100", sp.n, sp.v)
 					}
 					*sp.dst = uint32(sp.v*10 + 0.5)
@@ -290,7 +290,7 @@ capability. Nothing is changed without --yes.`,
 	f.BoolVar(&oneShot, "one-shot", false, "One-shot mode: no automatic retransmission")
 	f.BoolVar(&berr, "berr-reporting", false, "Report bus errors as error frames")
 	f.Uint32Var(&restartMs, "restart-ms", 0, "Automatic restart delay after bus-off in ms (0: off)")
-	f.IntVar(&mtu, "mtu", 0, "MTU: 16 (classical) or 72 (CAN FD)")
+	intVar(f, &mtu, "mtu", "", 0, "MTU: 16 (classical) or 72 (CAN FD)")
 	f.BoolVar(&restart, "restart", false, "Restart a bus-off controller")
 	return c
 }

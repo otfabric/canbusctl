@@ -3,6 +3,8 @@
 package cmd
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -64,4 +66,74 @@ func TestInject(t *testing.T) {
 func TestDecodeNaNAsJSON(t *testing.T) {
 	r := run(t, "", "dbc", "decode", "testdata/floats.dbc", "001##00000C07F000000000000F87F00000000", "--format", "json")
 	want(t, r, 0, `"physical":"NaN"`)
+}
+
+// TestSimulateCycleTimeRange: a cycle time from the database outside
+// 1..3600000 ms (1 hour) is ignored with a warning, and the message is
+// treated as one without a cycle time: simulated every --default-cycle,
+// or skipped without it. The range is checked on the database's 64-bit
+// value, before the period is computed, on every platform. Every value
+// was taken without a warning.
+func TestSimulateCycleTimeRange(t *testing.T) {
+	const head = "VERSION \"\"\n\nNS_ :\n\nBS_:\n\nBU_: ECU\n\nBO_ 256 M: 1 ECU\n SG_ S : 0|8@1+ (1,0) [0|255] \"\" ECU\n\n" +
+		"BA_DEF_ BO_ \"GenMsgCycleTime\" INT 0 0;\n"
+	const kcd = `<?xml version="1.0" encoding="UTF-8"?>
+<NetworkDefinition xmlns="http://kayak.2codeornot2code.org/1.0">
+  <Document name="t" version="1"/>
+  <Node id="1" name="A"/>
+  <Bus name="Main">
+    <Message id="0x10" name="M" length="1" interval="%s">
+      <Producer><NodeRef id="1"/></Producer>
+      <Signal name="S" offset="0" length="8"/>
+    </Message>
+  </Bus>
+</NetworkDefinition>
+`
+	type cycleCase struct {
+		name, db string
+		ok       bool // in range: simulated at it, without a warning
+	}
+	var cases []cycleCase
+	for _, v := range []string{"1", "3600000", "3600001", "4294967297", "9223372036854", "9223372036855", "9223372036854775807", "-1", "-9223372036854775808"} {
+		ok := v == "1" || v == "3600000"
+		cases = append(cases,
+			cycleCase{"BA_ " + v, writeFile(t, "ba.dbc", head+"BA_ \"GenMsgCycleTime\" BO_ 256 "+v+";\n"), ok},
+			cycleCase{"BA_DEF_DEF_ " + v, writeFile(t, "def.dbc", head+"BA_DEF_DEF_ \"GenMsgCycleTime\" "+v+";\n"), ok})
+	}
+	for _, v := range []string{"1", "3600000", "3600001", "-5"} {
+		cases = append(cases, cycleCase{"KCD interval " + v, writeFile(t, "ct.kcd", fmt.Sprintf(kcd, v)), v == "1" || v == "3600000"})
+	}
+	for _, c := range cases {
+		r := run(t, "", "simulate", "--dbc", c.db, "--duration", "100ms", "--max-frames", "2", "--format", "json")
+		warned := strings.Contains(r.errOut, "is outside 1..3600000 ms: ignored")
+		if c.ok {
+			want(t, r, 0)
+			if warned {
+				t.Fatalf("%s: warned: %s", c.name, r.errOut)
+			}
+			continue
+		}
+		want(t, r, 3, "no message to simulate", "skipped (no --default-cycle)")
+		if !warned {
+			t.Fatalf("%s: no warning: %s", c.name, r.errOut)
+		}
+		r = run(t, "", "simulate", "--dbc", c.db, "--duration", "1s", "--max-frames", "2", "--default-cycle", "5ms", "--format", "json")
+		want(t, r, 0, "simulated every --default-cycle 5ms")
+		recs := jsonLines(t, r.out)
+		if s := recs[len(recs)-1]; s["type"] != "summary" || s["sent"] != float64(2) {
+			t.Fatalf("%s: %v", c.name, s)
+		}
+	}
+	// 1 hour is a period, not "no cycle time": one frame in --duration.
+	r := run(t, "", "simulate", "--dbc", writeFile(t, "h.dbc", head+"BA_ \"GenMsgCycleTime\" BO_ 256 3600000;\n"), "--duration", "100ms", "--format", "json")
+	recs := jsonLines(t, r.out)
+	if s := recs[len(recs)-1]; r.code != 0 || s["sent"] != float64(1) {
+		t.Fatalf("exit %d: %v %s", r.code, s, r.errOut)
+	}
+	// 0 is "no cycle time", as before: no warning.
+	r = run(t, "", "simulate", "--dbc", writeFile(t, "z.dbc", head+"BA_ \"GenMsgCycleTime\" BO_ 256 0;\n"))
+	want(t, r, 3, "no message to simulate")
+	if strings.Contains(r.errOut, "outside") {
+		t.Fatal(r.errOut)
+	}
 }

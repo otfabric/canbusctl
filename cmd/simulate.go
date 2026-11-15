@@ -98,6 +98,31 @@ func (g *generator) muxValue(sw *candb.Signal) uint64 {
 	return vs[g.step%uint64(len(vs))]
 }
 
+// maxCycleTime is the longest cycle time simulate takes from a database.
+// A cycle time above it, or below 0, is ignored with a warning: the
+// message is simulated at --default-cycle, or skipped without it, as a
+// message without a cycle time.
+const maxCycleTime = time.Hour
+
+// cycleTimeMs returns the cycle time of m in milliseconds as the database
+// states it. A DBC's GenMsgCycleTime is read as the 64-bit attribute value
+// (its explicit value, else the attribute's default): candb.Message's
+// CycleTime is an int, which holds 32 bits on 32-bit platforms. A KCD
+// interval is CycleTime.
+func cycleTimeMs(db *candb.Database, m *candb.Message) int64 {
+	for _, at := range m.Attributes {
+		if at.Name == "GenMsgCycleTime" {
+			return at.Int
+		}
+	}
+	for _, d := range db.AttributeDefinitions {
+		if d.Name == "GenMsgCycleTime" && d.Object == candb.ObjectMessage && d.Default != nil && int(d.Default.Int) == m.CycleTime {
+			return d.Default.Int
+		}
+	}
+	return int64(m.CycleTime)
+}
+
 type simResult struct {
 	Interface string         `json:"interface"`
 	Sent      int            `json:"sent"`
@@ -124,6 +149,8 @@ func newSimulateCmd(a *app) *cobra.Command {
 		Long: `simulate sends the messages of a DBC, KCD or ARXML database at their cycle times
 (GenMsgCycleTime / interval; --default-cycle for the others) with signal values
 from --pattern: counter (the step number), random (seeded by --seed) or initial.
+A cycle time above 1 hour, or below 0, is ignored with a warning: the message is
+then treated as one without a cycle time.
 The same seed and database give the same frames. With --interface virtual the
 traffic stays in this process and is printed; on a vcan or vxcan interface it
 is sent; on any other interface it needs --yes. --duration (default 10s),
@@ -151,7 +178,19 @@ is sent; on any other interface it needs --yes. --duration (default 10s),
 				if len(msgs) > 0 && !contains(msgs, m.Name) {
 					continue
 				}
-				p := time.Duration(m.CycleTime) * time.Millisecond
+				// Range-checked before the conversion: the product with
+				// time.Millisecond does not fit time.Duration for every int64.
+				var p time.Duration
+				switch ms := cycleTimeMs(db, m); {
+				case ms > 0 && ms <= maxCycleTime.Milliseconds():
+					p = time.Duration(ms) * time.Millisecond
+				case ms != 0:
+					what := "skipped (no --default-cycle)"
+					if defCycle > 0 {
+						what = "simulated every --default-cycle " + defCycle.String()
+					}
+					a.warn("cycle time %d ms of message %q is outside 1..%d ms: ignored, the message is %s", ms, m.Name, maxCycleTime.Milliseconds(), what)
+				}
 				if p <= 0 {
 					p = defCycle
 				}

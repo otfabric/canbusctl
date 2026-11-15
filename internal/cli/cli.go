@@ -8,6 +8,7 @@ package cli
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -17,8 +18,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/otfabric/canbusctl/internal/errs"
+	"github.com/otfabric/canbusctl/internal/output"
 	"github.com/otfabric/go-canbus"
 	"github.com/otfabric/go-canbus/arxml"
 	"github.com/otfabric/go-canbus/candb"
@@ -125,34 +129,121 @@ func ParseAssignments(pairs []string, raw bool) (map[string]candb.Input, error) 
 	return out, nil
 }
 
-// LoadDatabase reads a DBC or KCD file (by extension, or by content
-// starting with '<'). Diagnostics are returned also when err is set.
+// MaxDatabaseHead bounds the white space read before the content of a
+// database file without a .dbc, .kcd or .arxml extension is recognised: the
+// largest source go-canbus parses (ARXML, 1 GiB; DBC and KCD 64 MiB).
+const MaxDatabaseHead = 1 << 30
+
+// LoadDatabase reads a DBC, KCD or ARXML file (by extension, or by
+// content: see DatabaseKind). The file is streamed to the go-canbus
+// parser, which bounds it (DBC and KCD 64 MiB, ARXML 1 GiB): a larger file,
+// a FIFO or a device is refused once the bound is read, not read whole.
+// Diagnostics are returned also when err is set.
 func LoadDatabase(path string) (*candb.Database, []candb.Diagnostic, string, error) {
-	src, err := os.ReadFile(filepath.Clean(path))
+	return loadDatabase(path, nil)
+}
+
+// LoadDatabaseSum is LoadDatabase that also returns the SHA-256 of the
+// whole file, read once.
+func LoadDatabaseSum(path string) (*candb.Database, []candb.Diagnostic, string, [sha256.Size]byte, error) {
+	h := sha256.New()
+	db, diags, kind, err := loadDatabase(path, h)
+	var sum [sha256.Size]byte
+	copy(sum[:], h.Sum(nil))
+	return db, diags, kind, sum, err
+}
+
+// readErr remembers the first error of r other than io.EOF.
+type readErr struct {
+	r   io.Reader
+	err error
+}
+
+func (e *readErr) Read(p []byte) (int, error) {
+	n, err := e.r.Read(p)
+	if err != nil && !errors.Is(err, io.EOF) && e.err == nil {
+		e.err = err
+	}
+	return n, err
+}
+
+func loadDatabase(path string, sum io.Writer) (*candb.Database, []candb.Diagnostic, string, error) {
+	f, err := os.Open(filepath.Clean(path))
 	if err != nil {
 		return nil, nil, "", errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot read database: %w", err)
 	}
-	kind := DatabaseKind(path, src)
+	defer func() { _ = f.Close() }()
+	var r io.Reader = f
+	if sum != nil {
+		r = io.TeeReader(f, sum)
+	}
+	in := &readErr{r: r}
+	readFailed := func() error {
+		return errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot read database: %w", in.err)
+	}
+	br := bufio.NewReader(in)
+	var head []byte
+	kind := extensionKind(path)
+	if kind == "" {
+		head = readHead(br)
+		if in.err != nil {
+			return nil, nil, "", readFailed()
+		}
+		kind = DatabaseKind(path, head)
+	}
+	src := io.MultiReader(bytes.NewReader(head), br)
 	var db *candb.Database
 	var diags []candb.Diagnostic
 	switch kind {
 	case "kcd":
-		db, diags, err = kcd.Parse(bytes.NewReader(src))
+		db, diags, err = kcd.Parse(src)
 	case "arxml":
-		db, diags, err = arxml.Parse(bytes.NewReader(src))
+		db, diags, err = arxml.Parse(src)
 	default:
-		db, diags, err = dbc.ParseBytes(src)
+		db, diags, err = dbc.Parse(src)
+	}
+	if in.err != nil {
+		return nil, nil, kind, readFailed()
 	}
 	if err != nil {
 		return db, diags, kind, &errs.Error{Kind: errs.KindInvalidInput, Code: errs.CodeInvalidDatabase,
 			Message: fmt.Sprintf("%s: %v", path, err), Cause: err}
 	}
+	if sum != nil {
+		// The parser may stop before the end (after the XML root): the
+		// sum covers the whole file. Streamed, so the memory stays small.
+		if _, err := io.Copy(io.Discard, br); err != nil || in.err != nil {
+			return nil, nil, kind, readFailed()
+		}
+	}
 	return db, diags, kind, nil
 }
 
-// DatabaseKind tells DBC, KCD and ARXML apart: by extension, else by
-// content (XML with an AUTOSAR root is ARXML, other XML is KCD).
-func DatabaseKind(path string, src []byte) string {
+// readHead reads the leading white space of r and at most 4096 bytes
+// after it: what DatabaseKind needs to recognise the content. It reads at
+// most MaxDatabaseHead bytes of white space.
+func readHead(r *bufio.Reader) []byte {
+	var head []byte
+	for len(head) < MaxDatabaseHead {
+		b, _ := r.Peek(utf8.UTFMax)
+		if len(b) == 0 {
+			return head
+		}
+		c, n := utf8.DecodeRune(b)
+		if !unicode.IsSpace(c) {
+			break
+		}
+		head = append(head, b[:n]...)
+		_, _ = r.Discard(n)
+	}
+	rest := make([]byte, 4096)
+	n, _ := io.ReadFull(r, rest)
+	return append(head, rest[:n]...)
+}
+
+// extensionKind is the kind of a database by its extension, "" when the
+// extension does not tell.
+func extensionKind(path string) string {
 	switch strings.ToLower(filepath.Ext(path)) {
 	case ".kcd":
 		return "kcd"
@@ -160,6 +251,15 @@ func DatabaseKind(path string, src []byte) string {
 		return "arxml"
 	case ".dbc":
 		return "dbc"
+	}
+	return ""
+}
+
+// DatabaseKind tells DBC, KCD and ARXML apart: by extension, else by
+// content (XML with an AUTOSAR root is ARXML, other XML is KCD).
+func DatabaseKind(path string, src []byte) string {
+	if k := extensionKind(path); k != "" {
+		return k
 	}
 	trim := bytes.TrimSpace(src)
 	if bytes.HasPrefix(trim, []byte("<")) {
@@ -288,9 +388,10 @@ func Timestamp(t time.Time) string {
 	return fmt.Sprintf("%d.%06d", t.Unix(), t.Nanosecond()/1000)
 }
 
-// FrameLine is the text form of a received frame (candump -L style).
+// FrameLine is the text form of a received frame (candump -L style). The
+// interface name, which a trace file may carry, is escaped (output.Escape).
 func FrameLine(f *canbus.Frame) string {
-	iface := f.Interface
+	iface := output.Escape(f.Interface)
 	if iface == "" {
 		iface = "-"
 	}
