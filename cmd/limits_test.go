@@ -130,13 +130,15 @@ func TestTraceInfoIdentifierBoundDefault(t *testing.T) {
 	}
 }
 
-// feedTransport is a transport that yields its frames, then cancels the
-// command (as Ctrl-C does) and waits to be closed. Receive is called by
-// one goroutine, the Bus that reads it: when it asks for the frame after
-// the last one, every frame has been handed to the subscriptions.
+// feedTransport is a transport that yields its frames once start is
+// closed (the command has subscribed), then cancels the command (as Ctrl-C
+// does) and waits to be closed. Receive is called by one goroutine, the
+// Bus that reads it: when it asks for the frame after the last one, every
+// frame has been handed to the subscriptions.
 type feedTransport struct {
 	frames []canbus.Frame
 	next   int
+	start  <-chan struct{}
 	cancel context.CancelFunc
 	closed chan struct{}
 	once   sync.Once
@@ -145,6 +147,13 @@ type feedTransport struct {
 func (s *feedTransport) Send(context.Context, *canbus.Frame) error { return canbus.ErrUnsupported }
 
 func (s *feedTransport) Receive(ctx context.Context, f *canbus.Frame) error {
+	if s.next == 0 {
+		select {
+		case <-s.start:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 	if s.next < len(s.frames) {
 		*f = s.frames[s.next]
 		s.next++
@@ -164,13 +173,13 @@ func (s *feedTransport) Close() error {
 	return nil
 }
 
-// runOnSource runs a command whose interface "src0" yields frames; the
-// command is cancelled once it has received them all.
-func runOnSource(t *testing.T, frames []canbus.Frame, args ...string) result {
+// runOnSource runs a command whose interface "src0" yields frames once
+// start is closed; the command is cancelled once it has received them all.
+func runOnSource(t *testing.T, frames []canbus.Frame, start <-chan struct{}, args ...string) result {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	src := &feedTransport{frames: frames, cancel: cancel, closed: make(chan struct{})}
+	src := &feedTransport{frames: frames, start: start, cancel: cancel, closed: make(chan struct{})}
 	prev := openTransport
 	openTransport = func(iface string, o openOpts) (canbus.Transport, error) {
 		if iface == "src0" {
@@ -197,12 +206,14 @@ func TestStatsIdentifierBound(t *testing.T) {
 	// short.
 	stats := func(frames []canbus.Frame, args ...string) result {
 		t.Helper()
+		start := make(chan struct{})
 		onReady(t, "stats", func() {
 			for t0 := time.Now(); time.Since(t0) <= 0; {
 				runtime.Gosched()
 			}
+			close(start)
 		})
-		return runOnSource(t, frames, args...)
+		return runOnSource(t, frames, start, args...)
 	}
 	for _, d := range []int{limit + 1, limit + 12, limit - 1, limit} {
 		ids, listed, other := idCase(d, limit)

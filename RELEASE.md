@@ -26,6 +26,8 @@ gains additive fields. Limits: SECURITY.md, "Limits".
 
 ### Changed
 
+- `stats --duration` also counts the frames the bus had received when the
+  duration ended or the command was interrupted, which it left uncounted.
 - `inject` on an interface (vcan, vxcan, or another with `--yes`) transmits
   at most `--max-frames` frames, the duplicates of `--duplicate` included.
   This is a fix: it transmitted every frame the fault stage forwarded, up to

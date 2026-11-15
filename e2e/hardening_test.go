@@ -23,7 +23,11 @@ func TestHardeningExitCodes(t *testing.T) {
 	// --repeat × frames overflowed past --max-frames. 2^62 is beyond 32
 	// bits: a 32-bit platform refuses it as a usage error.
 	if strconv.IntSize == 32 {
-		want(t, run(t, "", "send", "-i", "virtual", "--repeat", "4611686018427387904", "123#00", "123#00"), 2, "invalid argument")
+		r := run(t, "", "send", "-i", "virtual", "--repeat", "4611686018427387904", "123#00", "123#00")
+		want(t, r, 2)
+		if !strings.Contains(r.err, "invalid argument") {
+			t.Fatalf("stderr lacks %q: %s", "invalid argument", r.err)
+		}
 	} else {
 		want(t, run(t, "", "send", "-i", "virtual", "--repeat", "4611686018427387904", "123#00", "123#00"), 3)
 	}

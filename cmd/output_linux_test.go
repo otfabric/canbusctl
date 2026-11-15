@@ -25,9 +25,11 @@ func TestTraceOutputFailure(t *testing.T) {
 		{"xl monitor", []string{"xl", "monitor", "-i", "virtual", "-o", "/dev/full", "-n", "1"}},
 		{"record", []string{"record", "-i", "virtual", "-o", "/dev/full", "-n", "1"}},
 	} {
+		// One hook per run: a hook fires once.
 		onReady(t, c.ready, func() { sendVirtual(t, "123#0102") })
 		r := run(t, "", append(c.args, "--format", "json")...)
 		want(t, r, 10, `"code": "output_failed"`, "/dev/full")
+		onReady(t, c.ready, func() { sendVirtual(t, "123#0102") })
 		r = run(t, "", c.args...)
 		want(t, r, 10, "write /dev/full")
 	}

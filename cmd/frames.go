@@ -845,6 +845,17 @@ identifiers are counted together (otherFrames).`,
 				ready("stats")
 				counts := map[string]uint64{}
 				var other uint64
+				tally := func(f *canbus.Frame) {
+					if f.IsError() {
+						return
+					}
+					id := cli.ToJSON(f).IDHex
+					if _, known := counts[id]; known || len(counts) < idLimit {
+						counts[id]++
+					} else {
+						other++
+					}
+				}
 				for {
 					f, err := sub.Receive(ctx)
 					if err != nil {
@@ -853,13 +864,16 @@ identifiers are counted together (otherFrames).`,
 						}
 						return err
 					}
-					if !f.IsError() {
-						id := cli.ToJSON(&f).IDHex
-						if _, known := counts[id]; known || len(counts) < idLimit {
-							counts[id]++
-						} else {
-							other++
-						}
+					tally(&f)
+				}
+				// Frames the bus took in before the end are counted too.
+			drain:
+				for {
+					select {
+					case f := <-sub.Frames():
+						tally(&f)
+					default:
+						break drain
 					}
 				}
 				el := time.Since(start).Seconds()
