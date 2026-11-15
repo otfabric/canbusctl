@@ -14,7 +14,7 @@ RELEASE.md.
 |------|------|---------|
 | 0 | | Success |
 | 1 | | Findings: a result was written and it reports problems — `dbc validate` found errors (or warnings with `--strict`), `dbc decode` met frames that do not decode (or of unknown messages with `--strict`). No error document follows |
-| 2 | `usage` | Unknown command or flag, missing required flag or argument, a value a flag cannot hold |
+| 2 | `usage` | Unknown command or flag, missing required flag or argument, a value a flag cannot hold (an int flag holds the platform's `int`: 32 bits on 32-bit platforms) |
 | 3 | `invalid_input` | A value, file, frame, database, trace or combination of flags that does not make sense. Nothing was transmitted |
 | 4 | `transport` | The interface does not exist, is down, or failed while in use |
 | 5 | `timeout` | A deadline passed: an ISO-TP peer did not answer (N_Bs) or `isotp receive` got fewer messages than `--count` in `--timeout` |
@@ -51,6 +51,13 @@ identifier:
 `isotp monitor`, `simulate` and `replay --print` end normally (exit 0) at
 `--count`, `--duration` or Ctrl-C (SIGINT/SIGTERM).
 
+**Interrupted transmissions.** `send`, `send-fd`, `xl send`, `replay` and
+`inject` stopped by Ctrl-C (SIGINT/SIGTERM) also end with 0 and their
+partial result: `sent` (`send`, `send-fd`, `xl send`), `read` and `sent`
+(`replay`), `delivered` (`inject`). Compare it with what was asked for to
+tell an interrupted run from a complete one. `isotp send` and `isotp receive
+-n N` (N > 0), which have no partial result, end with 130.
+
 **Transmitting commands** validate everything before the first frame: an
 invocation that exits 2, 3, 8 or 13 has sent nothing. `replay` reads a whole
 trace file before sending, so a malformed record anywhere in it exits 3.
@@ -61,4 +68,9 @@ sent exits 10 with code `invalid_capture` and the number of frames sent.
 convert`, `dbc generate -o`, `dbc convert -o`) are created owner-only
 (0600); an existing file keeps its mode. An output path that is a symbolic
 link is refused with exit 3 (`file_open_failed`): name the target itself.
-`trace convert` removes its partial output when it fails.
+`trace convert` removes its partial output when it fails. `monitor -o`,
+`record` and `xl monitor -o` open the interface before they create the
+output, so an existing file is left alone when the interface does not open
+(exit 4 or 8). A trace output that cannot be written or closed (a full
+disk: the trace writers buffer, so the error may come at the end) exits 10
+(`output_failed`).

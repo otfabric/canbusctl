@@ -6,6 +6,73 @@ with the version bump). It computes the tag, builds the binaries for linux
 publishes the GitHub release with the section of this file that matches the
 version as its notes. Add the section before running it.
 
+## v0.13.0
+
+**Date:** 2026-11-15
+**Previous release:** v0.12.1
+
+Bounds on untrusted input and on `inject`, errors of trace outputs, and
+terminal-safe text output. No command or flag is removed; the JSON output
+gains additive fields. Limits: SECURITY.md, "Limits".
+
+### Added
+
+- `trace info` and `stats --duration` list at most 65,536 identifiers (a
+  real bus carries a few hundred). The frames of further identifiers are
+  counted in the new JSON field `otherFrames` (`stats`: in `live`); text
+  output adds one line, table output writes it to stderr.
+- `inject`: the JSON field `limited`, true when `--max-frames` held back
+  frames on an interface.
+
+### Changed
+
+- `inject` on an interface (vcan, vxcan, or another with `--yes`) transmits
+  at most `--max-frames` frames, the duplicates of `--duplicate` included.
+  This is a fix: it transmitted every frame the fault stage forwarded, up to
+  twice `--max-frames`. `delivered` counts the frames sent; a frame that
+  `--duration` stopped before it was sent was counted too.
+- Databases are streamed to the go-canbus parser instead of being read
+  whole first. A file beyond the parser's bound (DBC and KCD 64 MiB, ARXML
+  1 GiB), a FIFO or a device is refused once the bound is read (exit 3,
+  `invalid_database`); a file that loaded before still loads. Without a
+  `.dbc`, `.kcd` or `.arxml` extension the kind is still told by the content
+  after leading white space. `dbc generate` reads the file once for the
+  database and its SHA-256.
+- `simulate` uses cycle times of 1 ms to 1 hour from the database
+  (`GenMsgCycleTime`, KCD `interval`). Another value is ignored with a
+  warning on stderr, and the message is treated as one without a cycle time
+  (simulated every `--default-cycle`, or skipped). The range is checked on
+  the database's value before the period is computed, on 32-bit platforms
+  too; every value was taken without a warning.
+- Int flags hold the platform's `int`: on 32-bit platforms (the linux/armv7
+  release) a value beyond 32 bits is a usage error (exit 2); it was taken
+  modulo 2^32 (`--repeat 4294967297` sent one frame). 64-bit platforms are
+  unchanged.
+- `configure --sample-point` and `--dsample-point` refuse NaN and the
+  infinities (exit 3); NaN passed the check.
+- `monitor -o`, `record` and `xl monitor -o`: an error writing or closing the
+  trace output, such as a full disk, exits 10 (`output_failed`). The trace
+  writers buffer; `monitor -o` and `xl monitor -o` ignored the error of the
+  final write and exited 0.
+- `xl monitor -o` opens the interface before it creates the output, as
+  `monitor -o` and `record` do: an existing file is no longer truncated when
+  the interface does not open. When both would fail, the interface's error
+  is reported (exit 4 or 8; it was 3 for the output).
+- Text and table output write the characters of database and trace strings
+  that a terminal acts on (C0 and C1 control characters, DEL, Unicode
+  bidirectional formatting characters, bytes that are not UTF-8) as escapes
+  such as `\x1b`. JSON output is unchanged.
+
+### Documentation
+
+- docs/exitcodes.md: interrupted transmissions (`send`, `send-fd`, `xl
+  send`, `replay`, `inject`) end with 0 and their partial result, as they
+  did; trace output errors; the order of interface and output.
+- SECURITY.md: a "Limits" section; `isotp receive` sends flow control
+  frames without `--yes`, as README.md states. The root help says so too.
+
+---
+
 ## v0.12.1
 
 **Date:** 2026-11-15

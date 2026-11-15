@@ -36,13 +36,13 @@ func (o *isotpFlags) add(c *cobra.Command, needTx bool) {
 	f.StringVar(&o.txExt, "tx-ext", "", "Target address / address extension of sent frames (extended, mixed)")
 	f.StringVar(&o.rxExt, "rx-ext", "", "First byte expected in received frames (extended, mixed)")
 	f.BoolVar(&o.fd, "fd", false, "CAN FD frames")
-	f.IntVar(&o.txDL, "tx-dl", 0, "CAN FD data length of sent frames (8..64; default 64)")
+	intVar(f, &o.txDL, "tx-dl", "", 0, "CAN FD data length of sent frames (8..64; default 64)")
 	f.BoolVar(&o.brs, "brs", false, "CAN FD bit rate switching")
 	f.Uint8Var(&o.bs, "bs", 0, "Block size this receiver grants (0: all)")
 	f.DurationVar(&o.stmin, "stmin", 0, "STmin this receiver asks for (0..127ms, or 100µs..900µs)")
 	f.DurationVar(&o.fcDelay, "fc-delay", 0, "Wait this long before each flow control this receiver sends (N_Br, 0..1s; e.g. 200µs against the kernel's ISO-TP on vcan)")
 	f.StringVar(&o.padding, "padding", "", "Pad frames with this byte (hexadecimal, e.g. CC)")
-	f.IntVar(&o.maxSize, "max-size", 4095, "Largest message accepted")
+	intVar(f, &o.maxSize, "max-size", "", 4095, "Largest message accepted")
 	f.BoolVar(&o.kernel, "kernel", false, "Use the Linux kernel's ISO-TP sockets instead of the userspace implementation")
 	_ = c.MarkFlagRequired("interface")
 	_ = needTx
@@ -224,8 +224,8 @@ func newISOTPSendCmd(a *app) *cobra.Command {
 	}
 	o.add(c, true)
 	c.Flags().StringVar(&data, "data", "", "Payload in hexadecimal")
-	c.Flags().IntVar(&size, "size", 0, "Send a deterministic payload of this size (byte i = i mod 251)")
-	c.Flags().IntVarP(&count, "count", "n", 1, "Messages to send")
+	intVar(c.Flags(), &size, "size", "", 0, "Send a deterministic payload of this size (byte i = i mod 251)")
+	intVar(c.Flags(), &count, "count", "n", 1, "Messages to send")
 	c.Flags().BoolVar(&yes, "yes", false, "Confirm transmission on a non-virtual interface")
 	c.Flags().DurationVar(&timeout, "timeout", 30*time.Second, "Overall time limit")
 	return c
@@ -255,6 +255,7 @@ frames (--bs, --stmin). Use "isotp monitor" to observe without sending anything.
 				return err
 			}
 			defer closer()
+			ready("isotp receive")
 			ctx, cancel := bounded(cmd.Context(), timeout)
 			defer cancel()
 			st := a.stream()
@@ -282,7 +283,7 @@ frames (--bs, --stmin). Use "isotp monitor" to observe without sending anything.
 		},
 	}
 	o.add(c, false)
-	c.Flags().IntVarP(&count, "count", "n", 1, "Messages to receive (0: until the timeout or Ctrl-C)")
+	intVar(c.Flags(), &count, "count", "n", 1, "Messages to receive (0: until the timeout or Ctrl-C)")
 	c.Flags().DurationVar(&timeout, "timeout", 0, "Stop after this time (0: no limit)")
 	return c
 }
@@ -353,6 +354,7 @@ N_Cr timeout) are printed as notes.`,
 					}
 				}()
 			}
+			ready("isotp monitor")
 			st := a.stream()
 			for {
 				select {

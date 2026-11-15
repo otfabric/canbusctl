@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -75,6 +76,55 @@ func runWithTraffic(t *testing.T, frames []canbus.Frame, args ...string) result 
 	code := Run(ctx, args, strings.NewReader(""), &out, &errOut)
 	close(done)
 	return result{code, out.String(), errOut.String()}
+}
+
+// onReady sets readyHook for the test: fn runs once, in the command,
+// when the command what is ready (it has opened its interface and waits).
+func onReady(t *testing.T, what string, fn func()) {
+	t.Helper()
+	onReadyEach(t, map[string]func(){what: fn})
+}
+
+// onReadyEach is onReady for several commands: fns[what] runs once when
+// the command what is ready.
+func onReadyEach(t *testing.T, fns map[string]func()) {
+	t.Helper()
+	once := map[string]*sync.Once{}
+	for what := range fns {
+		once[what] = new(sync.Once)
+	}
+	h := func(w string) {
+		if o := once[w]; o != nil {
+			o.Do(fns[w])
+		}
+	}
+	readyHook.Store(&h)
+	t.Cleanup(func() { readyHook.Store(nil) })
+}
+
+// readySignals returns, per command name, a channel closed when that
+// command is ready.
+func readySignals(t *testing.T, names ...string) map[string]chan struct{} {
+	t.Helper()
+	chs := map[string]chan struct{}{}
+	fns := map[string]func(){}
+	for _, n := range names {
+		ch := make(chan struct{})
+		chs[n], fns[n] = ch, func() { close(ch) }
+	}
+	onReadyEach(t, fns)
+	return chs
+}
+
+// await waits for a ready signal of a command running in the background,
+// failing when the command ends first.
+func await(t *testing.T, what string, ready <-chan struct{}, done <-chan result) {
+	t.Helper()
+	select {
+	case <-ready:
+	case r := <-done:
+		t.Fatalf("%s ended before it was ready: exit %d\nstdout: %s\nstderr: %s", what, r.code, r.out, r.errOut)
+	}
 }
 
 func want(t *testing.T, r result, code int, contains ...string) {

@@ -11,6 +11,7 @@ import (
 	"io"
 	"strings"
 	"text/tabwriter"
+	"unicode/utf8"
 )
 
 // SchemaVersion of every JSON document canbusctl writes.
@@ -73,9 +74,75 @@ func Write(w io.Writer, f Format, command string, r Result) error {
 		}
 	default:
 	}
-	s := strings.TrimSuffix(r.Text(), "\n")
+	s := escapeText(strings.TrimSuffix(r.Text(), "\n"))
 	_, err := io.WriteString(w, s+"\n")
 	return err
+}
+
+// Escape returns s with the characters a terminal acts on written as
+// escapes: the C0 control characters (\n and \t included) and DEL as
+// \x1b, the C1 control characters as \u009b, the Unicode bidirectional
+// formatting characters as \u202e, and bytes that are not UTF-8 as \xff.
+// Text and table output pass the strings of databases and traces through
+// it; JSON escapes them itself.
+func Escape(s string) string { return escape(s, false) }
+
+// escapeText is Escape for a whole text result or record: it keeps the
+// line breaks and tabs of its layout.
+func escapeText(s string) string { return escape(s, true) }
+
+func escape(s string, layout bool) string {
+	var b *strings.Builder
+	for i := 0; i < len(s); {
+		c := s[i]
+		if c >= 0x20 && c < 0x7f {
+			if b != nil {
+				b.WriteByte(c)
+			}
+			i++
+			continue
+		}
+		r, n := rune(c), 1
+		if c >= utf8.RuneSelf {
+			r, n = utf8.DecodeRuneInString(s[i:])
+		}
+		var esc string
+		switch {
+		case r == utf8.RuneError && n == 1:
+			esc = fmt.Sprintf(`\x%02x`, c)
+		case r < 0x20 || r == 0x7f:
+			if !layout || r != '\n' && r != '\t' {
+				esc = fmt.Sprintf(`\x%02x`, r)
+			}
+		case r >= 0x80 && r <= 0x9f || bidi(r):
+			esc = fmt.Sprintf(`\u%04x`, r)
+		}
+		if esc == "" {
+			if b != nil {
+				b.WriteString(s[i : i+n])
+			}
+			i += n
+			continue
+		}
+		if b == nil {
+			b = &strings.Builder{}
+			b.Grow(len(s) + 8)
+			b.WriteString(s[:i])
+		}
+		b.WriteString(esc)
+		i += n
+	}
+	if b == nil {
+		return s
+	}
+	return b.String()
+}
+
+// bidi reports a Unicode bidirectional formatting character: the marks
+// ALM, LRM and RLM, the embeddings and overrides LRE..RLO and the isolates
+// LRI..PDI.
+func bidi(r rune) bool {
+	return r == 0x061C || r == 0x200E || r == 0x200F || r >= 0x202A && r <= 0x202E || r >= 0x2066 && r <= 0x2069
 }
 
 // WriteError renders a fatal error document.
@@ -94,14 +161,22 @@ func writeJSON(w io.Writer, v any) error {
 	return err
 }
 
-// WriteTable writes aligned columns.
+// WriteTable writes aligned columns. Every cell is escaped (Escape).
 func WriteTable(w io.Writer, headers []string, rows [][]string) error {
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, strings.Join(headers, "\t"))
+	_, _ = fmt.Fprintln(tw, joinCells(headers))
 	for _, r := range rows {
-		_, _ = fmt.Fprintln(tw, strings.Join(r, "\t"))
+		_, _ = fmt.Fprintln(tw, joinCells(r))
 	}
 	return tw.Flush()
+}
+
+func joinCells(cells []string) string {
+	out := make([]string, len(cells))
+	for i, c := range cells {
+		out[i] = Escape(c)
+	}
+	return strings.Join(out, "\t")
 }
 
 // Stream writes one record per line: a line of text, or with JSON one
@@ -119,7 +194,7 @@ func NewStream(w io.Writer, f Format) *Stream { return &Stream{w: w, f: f} }
 // fields for JSON.
 func (s *Stream) Record(typ string, text string, fields any) error {
 	if s.f != JSON {
-		_, err := io.WriteString(s.w, text+"\n")
+		_, err := io.WriteString(s.w, escapeText(text)+"\n")
 		return err
 	}
 	b, err := json.Marshal(fields)

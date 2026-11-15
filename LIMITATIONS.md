@@ -51,6 +51,13 @@ Gaps and follow-ups, grouped and ordered: [ROADMAP.md](ROADMAP.md).
   and pcapng hold CAN XL; `trace convert` reports CAN XL frames it cannot
   write.
 - `simulate` generates values from patterns (counter, random, initial); it does
-  not model ECU behaviour or react to traffic.
+  not model ECU behaviour or react to traffic. It takes cycle times of 1 ms
+  to 1 hour from a database; others are ignored with a warning.
+- `trace info` and `stats --duration` list at most 65,536 identifiers; the
+  frames of further identifiers are counted together (`otherFrames`). The
+  other bounds: SECURITY.md, "Limits".
+- Text and table output escape control and bidirectional formatting
+  characters of database and trace strings; diagnostics on stderr (error
+  lines, warnings, `dbc convert` diagnostics) do not.
 - No device discovery or fingerprinting: a CAN identifier does not identify a
   device.

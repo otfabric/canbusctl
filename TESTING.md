@@ -18,6 +18,14 @@ Per-package override: the root package main is not gated (`COVER_PKG_SKIP`). It 
 through `cmd.Run` with captured streams and check exit codes, text and JSON.
 Commands that receive run on the in-process virtual bus while the test sends
 frames on it; ISO-TP sender and receiver run as two concurrent invocations.
+Tests synchronise with the commands without sleeping: a receiving command
+calls the unexported `readyHook` (`cmd/root.go`) once it has opened its
+interface and waits, and the tests send, start the peer or interrupt only
+then (`onReady`, `readySignals` in `cmd/helpers_test.go`); a transmitting
+command is interrupted once its first frame arrives on a port of the
+virtual bus. Commands that need a transport the test controls replace
+`openTransport` (a source that yields given frames, a sink that keeps what
+is sent: `cmd/limits_test.go`).
 Golden files (`cmd/testdata/golden`, regenerate with
 `go test ./cmd -update`) pin `dbc inspect` and `dbc decode` output.
 
@@ -62,7 +70,14 @@ goroutine is left. `CANBUS_CHAOS_ITERATIONS` sets the number of seeds.
 huge, deep and out-of-range databases; traces with timestamps out of range
 and frames a target format cannot hold (exit 10 and no output file);
 garbage and over-long lines on stdin; the transmit bounds; `--yes` for every
-transmitting command; SIGINT and SIGTERM of the long-running commands.
+transmitting command; SIGINT and SIGTERM of the long-running commands; the
+bounds of SECURITY.md "Limits" (`cmd/limits_test.go`, a FIFO database in
+`cmd/limits_unix_test.go`), trace outputs whose writes fail (a FIFO whose
+reader closed, `cmd/output_unix_test.go`; `/dev/full`,
+`cmd/output_linux_test.go`), terminal escapes from databases and traces
+(`cmd/escape_test.go`), and the int flags at the 32-bit boundary
+(`cmd/intflag_test.go`: on a 32-bit platform a value beyond 32 bits exits 2;
+CI runs every test as linux/386, the job "Tests on linux/386").
 Output paths: `..` is resolved as given, a symbolic link is followed (its
 target written, keeping its mode; an existing file keeps its mode too),
 converting a trace onto itself is refused.

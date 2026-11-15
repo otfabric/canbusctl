@@ -3,6 +3,7 @@
 package cmd
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -20,11 +21,25 @@ func TestXLRefusals(t *testing.T) {
 	want(t, run(t, "", "xl", "send", "-i", "vcanxl0", "--yes", "--max-frames", "1", "--repeat", "2", "00242#80:00:00000000#11"), 3, "--max-frames")
 	want(t, run(t, "", "xl", "send", "-i", "vcanxl0"), 2)
 	want(t, run(t, "", "xl", "monitor", "-i", "vcanxl0", "-o", "x.blf"), 3, "cannot hold CAN XL")
-	want(t, run(t, "", "xl", "monitor", "-i", "vcanxl0", "-o", "/nonexistent/x.log"), 3, "cannot create")
+	// The interface is opened before the output is created (it opens here).
+	want(t, run(t, "", "xl", "monitor", "-i", "virtual", "-o", "/nonexistent/x.log"), 3, "cannot create")
 	if !linux() {
 		want(t, run(t, "", "xl", "monitor", "-i", "vcanxl0", "-n", "1"), 8, "SocketCAN is not available")
 	}
-	r := run(t, "", "xl", "--help")
+	// An existing output is left alone when the interface does not open
+	// (it was truncated first).
+	keep := filepath.Join(t.TempDir(), "keep.log")
+	if err := os.WriteFile(keep, []byte("(1700000000.000000) can0 123#00\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	r := run(t, "", "xl", "monitor", "-i", "nosuchxl0", "-o", keep, "-n", "1")
+	if r.code != 4 && r.code != 8 {
+		t.Fatalf("exit %d, want 4 (no interface) or 8 (no SocketCAN): %s", r.code, r.errOut)
+	}
+	if b, err := os.ReadFile(keep); err != nil || string(b) != "(1700000000.000000) can0 123#00\n" {
+		t.Fatalf("the output was changed: %q %v", b, err)
+	}
+	r = run(t, "", "xl", "--help")
 	want(t, r, 0, "<vcid><prio>#<flags>:<sdt>:<af>#<data>")
 }
 

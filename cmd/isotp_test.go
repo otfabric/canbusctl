@@ -10,20 +10,29 @@ import (
 	"time"
 )
 
-// pairRun runs a receiving and a sending invocation on one virtual bus.
+// background runs a command in its own goroutine; its result arrives on
+// the channel.
+func background(ctx context.Context, args []string) chan result {
+	rc := make(chan result, 1)
+	go func() {
+		var out, errOut bytes.Buffer
+		code := Run(ctx, args, strings.NewReader(""), &out, &errOut)
+		rc <- result{code, out.String(), errOut.String()}
+	}()
+	return rc
+}
+
+// pairRun runs a receiving and a sending invocation on one virtual bus,
+// the sender once the receiver listens.
 func pairRun(t *testing.T, recv, send []string) (result, result) {
 	t.Helper()
 	resetVirtual()
 	_ = sharedVirtual()
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	rc := make(chan result, 1)
-	go func() {
-		var out, errOut bytes.Buffer
-		code := Run(ctx, recv, strings.NewReader(""), &out, &errOut)
-		rc <- result{code, out.String(), errOut.String()}
-	}()
-	time.Sleep(150 * time.Millisecond)
+	ready := readySignals(t, "isotp receive")
+	rc := background(ctx, recv)
+	await(t, "isotp receive", ready["isotp receive"], rc)
 	var out, errOut bytes.Buffer
 	code := Run(ctx, send, strings.NewReader(""), &out, &errOut)
 	return <-rc, result{code, out.String(), errOut.String()}
@@ -54,25 +63,17 @@ func TestISOTPExchange(t *testing.T) {
 	_ = sharedVirtual()
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	mc := make(chan result, 1)
-	go func() {
-		var out, errOut bytes.Buffer
-		code := Run(ctx, mon, strings.NewReader(""), &out, &errOut)
-		mc <- result{code, out.String(), errOut.String()}
-	}()
-	time.Sleep(100 * time.Millisecond)
-	rc := make(chan int, 1)
-	go func() {
-		var o, e bytes.Buffer
-		rc <- Run(ctx, append([]string{"isotp", "receive", "--tx-id", "7E8", "--rx-id", "7E0", "--timeout", "5s"}, common...), strings.NewReader(""), &o, &e)
-	}()
-	time.Sleep(100 * time.Millisecond)
+	ready := readySignals(t, "isotp monitor", "isotp receive")
+	mc := background(ctx, mon)
+	await(t, "isotp monitor", ready["isotp monitor"], mc)
+	rc := background(ctx, append([]string{"isotp", "receive", "--tx-id", "7E8", "--rx-id", "7E0", "--timeout", "5s"}, common...))
+	await(t, "isotp receive", ready["isotp receive"], rc)
 	var o, e bytes.Buffer
 	if code := Run(ctx, append([]string{"isotp", "send", "--tx-id", "7E0", "--rx-id", "7E8", "--size", "100"}, common...), strings.NewReader(""), &o, &e); code != 0 {
 		t.Fatal(o.String(), e.String())
 	}
-	if code := <-rc; code != 0 {
-		t.Fatal("receiver", code)
+	if r := <-rc; r.code != 0 || !strings.Contains(r.out, "100 bytes") {
+		t.Fatal("receiver", r)
 	}
 	m := <-mc
 	want(t, m, 0, "7E0: 100 bytes: 00010203")
@@ -127,13 +128,9 @@ func TestISOTPMonitorNotes(t *testing.T) {
 	vb := sharedVirtual()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	mc := make(chan result, 1)
-	go func() {
-		var o, e bytes.Buffer
-		code := Run(ctx, []string{"isotp", "monitor", "-i", "virtual", "--tx-id", "7E0", "--rx-id", "7E8", "--duration", "500ms", "--format", "json"}, strings.NewReader(""), &o, &e)
-		mc <- result{code, o.String(), e.String()}
-	}()
-	time.Sleep(100 * time.Millisecond)
+	ready := readySignals(t, "isotp monitor")
+	mc := background(ctx, []string{"isotp", "monitor", "-i", "virtual", "--tx-id", "7E0", "--rx-id", "7E8", "--duration", "500ms", "--format", "json"})
+	await(t, "isotp monitor", ready["isotp monitor"], mc)
 	spy, _ := vb.Open()
 	tx, _ := vb.Open()
 	for _, s := range []string{"7E0#1014000102030405", "7E0#2306070809"} {

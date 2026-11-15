@@ -14,6 +14,7 @@ import (
 
 	"github.com/otfabric/canbusctl/internal/cli"
 	"github.com/otfabric/canbusctl/internal/errs"
+	"github.com/otfabric/canbusctl/internal/output"
 	"github.com/otfabric/go-canbus"
 	"github.com/otfabric/go-canbus/candb"
 	"github.com/otfabric/go-canbus/capture"
@@ -73,15 +74,17 @@ func decodeSignals(sigs []candb.DecodedSignal) []decodedSignal {
 // the full float64 and the exact raw value.
 func human(f float64) string { return strconv.FormatFloat(f, 'g', 12, 64) }
 
+// signalsText is the text form of decoded signals; the names, units and
+// labels of the database are escaped (output.Escape).
 func signalsText(sigs []decodedSignal) string {
 	var parts []string
 	for _, s := range sigs {
-		p := s.Name + "=" + human(s.value)
+		p := output.Escape(s.Name) + "=" + human(s.value)
 		if s.Unit != "" {
-			p += " " + s.Unit
+			p += " " + output.Escape(s.Unit)
 		}
 		if s.Label != "" {
-			p += " (" + s.Label + ")"
+			p += " (" + output.Escape(s.Label) + ")"
 		}
 		parts = append(parts, p)
 	}
@@ -103,10 +106,10 @@ func record(f *canbus.Frame, db *candb.Database) (frameRecord, string) {
 			sigs, err := m.Decode(f.Payload())
 			if err != nil {
 				r.Decode = err.Error()
-				text += "  " + m.Name + ": " + err.Error()
+				text += "  " + output.Escape(m.Name) + ": " + output.Escape(err.Error())
 			} else {
 				r.Signals = decodeSignals(sigs)
-				text += "  " + m.Name + ": " + signalsText(r.Signals)
+				text += "  " + output.Escape(m.Name) + ": " + signalsText(r.Signals)
 			}
 		}
 	}
@@ -160,6 +163,7 @@ or ",data"; several filters are ORed, or ANDed with --join.`,
 				return err
 			}
 			var tw capture.Writer
+			var out *traceOutput
 			if output != "" {
 				format, err := cli.TraceFormat(output, "")
 				if err != nil {
@@ -172,12 +176,14 @@ or ",data"; several filters are ORed, or ANDed with --join.`,
 				if err != nil {
 					return errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot create %s: %w", output, err)
 				}
-				defer func() { _ = file.Close() }()
 				if tw, err = newTraceWriter(file, format, direction); err != nil {
+					_ = file.Close()
 					return err
 				}
-				defer func() { _ = tw.Close() }()
+				out = &traceOutput{path: output, w: tw, file: file}
+				defer func() { _ = out.close() }()
 			}
+			ready("monitor")
 			ctx, cancel := bounded(cmd.Context(), duration)
 			defer cancel()
 			st := a.stream()
@@ -201,6 +207,9 @@ or ",data"; several filters are ORed, or ANDed with --join.`,
 				}
 				n++
 			}
+			if err := out.close(); err != nil {
+				return err
+			}
 			s := summary{Frames: uint64(n), Dropped: bus.Stats().Dropped}
 			if a.format == "json" {
 				return st.Record("summary", "", s)
@@ -218,7 +227,7 @@ or ",data"; several filters are ORed, or ANDed with --join.`,
 	f.StringVar(&dbPath, "dbc", "", "Decode with this DBC, KCD or ARXML database")
 	f.StringVarP(&output, "output", "o", "", "Also write the frames to this trace file")
 	f.BoolVar(&direction, "direction", false, "candump --output: end each line with R or T (received, sent by this host)")
-	f.IntVarP(&count, "count", "n", 0, "Stop after this many frames (0: no limit)")
+	intVar(f, &count, "count", "n", 0, "Stop after this many frames (0: no limit)")
 	f.DurationVar(&duration, "duration", 0, "Stop after this time (0: until Ctrl-C)")
 	_ = c.MarkFlagRequired("interface")
 	return c
@@ -233,7 +242,7 @@ type sendLimits struct {
 
 func addLimitFlags(c *cobra.Command, l *sendLimits, defRate float64) {
 	c.Flags().Float64Var(&l.rate, "rate", defRate, "Transmit at most this many frames per second (0: no limit)")
-	c.Flags().IntVar(&l.maxFrames, "max-frames", 10000, "Transmit at most this many frames (0: no limit)")
+	intVar(c.Flags(), &l.maxFrames, "max-frames", "", 10000, "Transmit at most this many frames (0: no limit)")
 	c.Flags().DurationVar(&l.duration, "duration", 0, "Stop transmitting after this time (0: no limit)")
 	// Checked before RunE: a negative or NaN bound would silently mean
 	// "no limit" (replay already refused negative ones through go-canbus).
@@ -425,14 +434,14 @@ without --yes.`,
 	fl.StringVar(&id, "id", "", "Identifier in hexadecimal (with --data)")
 	fl.StringVar(&data, "data", "", "Payload in hexadecimal")
 	fl.BoolVar(&extended, "extended", false, "29-bit identifier")
-	fl.IntVar(&repeat, "repeat", 1, "Send the frames this many times")
+	intVar(fl, &repeat, "repeat", "", 1, "Send the frames this many times")
 	fl.DurationVar(&gap, "gap", 0, "Pause between frames")
 	if fd {
 		fl.BoolVar(&brs, "brs", false, "Bit rate switching")
 		fl.BoolVar(&esi, "esi", false, "Set the error state indicator")
 	} else {
 		fl.BoolVar(&rtr, "rtr", false, "Remote transmission request")
-		fl.IntVar(&dlc, "dlc", 0, "Requested length of a remote frame")
+		intVar(fl, &dlc, "dlc", "", 0, "Requested length of a remote frame")
 	}
 	addLimitFlags(c, &limits, 0)
 	_ = c.MarkFlagRequired("interface")
@@ -563,11 +572,14 @@ candump -L -x does.`,
 			if err != nil {
 				return errs.New(errs.KindInvalidInput, errs.CodeFileOpen, "cannot create %s: %w", out, err)
 			}
-			defer func() { _ = file.Close() }()
 			w, err := newTraceWriter(file, format, direction)
 			if err != nil {
+				_ = file.Close()
 				return err
 			}
+			to := &traceOutput{path: out, w: w, file: file}
+			defer func() { _ = to.close() }()
+			ready("record")
 			ctx, cancel := bounded(cmd.Context(), duration)
 			defer cancel()
 			var n int
@@ -576,7 +588,7 @@ candump -L -x does.`,
 			} else {
 				n, err = capture.RecordFrames(ctx, sub, w, count)
 			}
-			if cerr := w.Close(); err == nil && cerr != nil {
+			if cerr := to.close(); err == nil {
 				err = cerr
 			}
 			if err != nil {
@@ -594,7 +606,7 @@ candump -L -x does.`,
 	f.BoolVar(&noFD, "no-fd", false, "Do not open the socket for CAN FD")
 	f.BoolVar(&xl, "xl", false, "Also record CAN XL frames (SocketCAN with the CAN XL MTU, or virtual)")
 	f.BoolVar(&direction, "direction", false, "candump output: end each line with R or T (received, sent by this host)")
-	f.IntVarP(&count, "count", "n", 0, "Stop after this many frames")
+	intVar(f, &count, "count", "n", 0, "Stop after this many frames")
 	f.DurationVar(&duration, "duration", 0, "Stop after this time")
 	_ = c.MarkFlagRequired("interface")
 	_ = c.MarkFlagRequired("output")
@@ -728,6 +740,22 @@ without it they are counted, not sent.`,
 	return c
 }
 
+// maxDistinctIDs bounds the per-identifier tables of trace info and stats
+// --duration, whose memory grows with the number of distinct identifiers
+// (a CAN XL VCID and priority pair, and error frames, count as one each):
+// the first maxDistinctIDs identifiers are listed, the frames of any
+// further ones are counted in otherFrames. A real bus carries a few
+// hundred identifiers.
+const maxDistinctIDs = 1 << 16
+
+// idLimit is maxDistinctIDs; tests lower it.
+var idLimit = maxDistinctIDs
+
+// otherFramesText is the text line of the frames not listed by identifier.
+func otherFramesText(n uint64) string {
+	return fmt.Sprintf("%d frames of further identifiers not listed (at most %d identifiers are listed)", n, idLimit)
+}
+
 type idStat struct {
 	ID     string  `json:"id"`
 	Frames uint64  `json:"frames"`
@@ -747,6 +775,9 @@ type liveStats struct {
 	ErrorFrames uint64   `json:"errorFrames"`
 	Dropped     uint64   `json:"dropped"`
 	IDs         []idStat `json:"ids"`
+	// OtherFrames counts the frames of identifiers not listed in IDs,
+	// which holds at most maxDistinctIDs identifiers.
+	OtherFrames uint64 `json:"otherFrames"`
 }
 
 func (r statsResult) Text() string {
@@ -758,6 +789,9 @@ func (r statsResult) Text() string {
 		fmt.Fprintf(&b, "live %.1f s: %d frames, %d bytes, %d error frames, %d dropped\n", l.DurationS, l.Frames, l.Bytes, l.ErrorFrames, l.Dropped)
 		for _, s := range l.IDs {
 			fmt.Fprintf(&b, "  %-9s %8d frames %10.2f Hz\n", s.ID, s.Frames, s.RateHz)
+		}
+		if l.OtherFrames > 0 {
+			b.WriteString("  " + otherFramesText(l.OtherFrames) + "\n")
 		}
 	}
 	return b.String()
@@ -782,7 +816,11 @@ func newStatsCmd(a *app) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "stats",
 		Short: "Show interface counters and, with --duration, count live traffic per identifier (passive)",
-		Args:  cobra.NoArgs,
+		Long: `stats prints the counters of an interface (Linux) and, with --duration, receives
+for that long and counts the frames and rate of each identifier. It never
+transmits. At most 65536 identifiers are listed; the frames of further
+identifiers are counted together (otherFrames).`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			res := statsResult{Interface: iface}
 			if iface != cli.Virtual {
@@ -804,7 +842,9 @@ func newStatsCmd(a *app) *cobra.Command {
 				ctx, cancel := bounded(cmd.Context(), duration)
 				defer cancel()
 				start := time.Now()
+				ready("stats")
 				counts := map[string]uint64{}
+				var other uint64
 				for {
 					f, err := sub.Receive(ctx)
 					if err != nil {
@@ -814,17 +854,25 @@ func newStatsCmd(a *app) *cobra.Command {
 						return err
 					}
 					if !f.IsError() {
-						counts[cli.ToJSON(&f).IDHex]++
+						id := cli.ToJSON(&f).IDHex
+						if _, known := counts[id]; known || len(counts) < idLimit {
+							counts[id]++
+						} else {
+							other++
+						}
 					}
 				}
 				el := time.Since(start).Seconds()
 				bs := bus.Stats()
-				l := &liveStats{DurationS: el, Frames: bs.RxFrames, Bytes: bs.RxBytes, ErrorFrames: bs.RxErrors, Dropped: bs.Dropped, IDs: []idStat{}}
+				l := &liveStats{DurationS: el, Frames: bs.RxFrames, Bytes: bs.RxBytes, ErrorFrames: bs.RxErrors, Dropped: bs.Dropped, IDs: []idStat{}, OtherFrames: other}
 				for id, n := range counts {
 					l.IDs = append(l.IDs, idStat{ID: id, Frames: n, RateHz: float64(n) / el})
 				}
 				sort.Slice(l.IDs, func(i, j int) bool { return l.IDs[i].ID < l.IDs[j].ID })
 				res.Live = l
+				if a.format == output.Table && other > 0 {
+					a.warn("%s", otherFramesText(other))
+				}
 			}
 			return a.emit("stats", res)
 		},

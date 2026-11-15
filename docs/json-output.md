@@ -30,11 +30,16 @@ convert/info, simulate, inject, bridge) write one indented document:
 target format could not keep, CAN XL frames in ASC/BLF/TRC included);
 `trace info` the frame kinds (`classical`, `fd`, `xl`, `remote`, `errors`)
 and per-identifier `ids` (`frames`, `rateHz`, `minLen`, `maxLen`; CAN XL
-frames as `"XL <vcid><priority>"`, e.g. `"XL 05242"`); `replay` also
+frames as `"XL <vcid><priority>"`, e.g. `"XL 05242"`), at most 65,536 of
+them: `otherFrames` counts the frames of further identifiers (v0.13.0;
+`stats --duration` likewise, in `live`: `ids` and `otherFrames`); `replay` also
 `skippedXL` (CAN XL frames not sent without `--xl`); `bridge` the counters of each
 direction (`aToB`, `bToA`: `received`, `forwarded`, `dropped`, `duplicated`,
 `delayed`, `reordered`, `corrupted`). `inject`'s `faults` has the same
-counters (v0.2.0: `received`, `forwarded` and `reordered` are new).
+counters (v0.2.0: `received`, `forwarded` and `reordered` are new);
+`delivered` counts the frames it delivered (on an interface: sent), and
+`limited` (v0.13.0) is true when `--max-frames` held back frames on an
+interface.
 
 ## version
 
@@ -50,6 +55,10 @@ Every key is always present. A development build has `"version":"dev"`,
 `"built":"unknown"`. `libraries` lists the OT Fabric libraries
 (`github.com/otfabric/go-*`) the binary is built on, sorted by name, with
 their versions without the leading `v`; `[]` when there are none.
+
+Text and table output escape the characters of database and trace strings
+a terminal acts on (`\x1b` for ESC); JSON carries the strings themselves,
+escaped by JSON.
 
 ## Streams
 

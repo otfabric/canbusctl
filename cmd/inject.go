@@ -25,6 +25,9 @@ type injectResult struct {
 	Faults     chaos.Stats `json:"faults"`
 	ErrorFrame string      `json:"errorFrame,omitempty"`
 	Malformed  int         `json:"malformed"`
+	// Limited reports that --max-frames stopped the transmission on an
+	// interface before every surviving frame was sent.
+	Limited bool `json:"limited"`
 }
 
 func (r injectResult) Text() string {
@@ -35,6 +38,9 @@ func (r injectResult) Text() string {
 	}
 	if r.Malformed > 0 {
 		s += fmt.Sprintf("; %d malformed frames", r.Malformed)
+	}
+	if r.Limited {
+		s += "; stopped by --max-frames"
 	}
 	return s
 }
@@ -76,7 +82,8 @@ a seeded fault stage (the chaos bridge of go-canbus, as in "bridge") —
                        --malformed N (frames violating the length rules)
                        are injected there too.
   vcan / vxcan         the surviving frames are transmitted, faults applied in
-                       userspace before sending. Error frames and malformed
+                       userspace before sending, at most --max-frames of
+                       them (duplicates included). Error frames and malformed
                        frames cannot be sent through SocketCAN (exit 8).
   other interfaces     refused without --yes.
 
@@ -187,6 +194,7 @@ produced. The same --seed gives the same faults.`,
 			for br.Stats().Received < uint64(len(src)) && ctx.Err() == nil {
 				time.Sleep(time.Millisecond)
 			}
+			ready("inject")
 			_ = bridgeIn.Close()
 			<-bridgeDone
 			res := injectResult{Interface: iface, Source: len(src)}
@@ -216,8 +224,13 @@ produced. The same --seed gives the same faults.`,
 				if err != nil {
 					break
 				}
-				res.Delivered++
 				if target != nil {
+					// --max-frames bounds what reaches the interface,
+					// duplicated frames included.
+					if limits.maxFrames > 0 && res.Delivered >= limits.maxFrames {
+						res.Limited = true
+						break
+					}
 					if err := pace.wait(ctx); err != nil {
 						break
 					}
@@ -226,8 +239,10 @@ produced. The same --seed gives the same faults.`,
 					if err := target.Send(ctx, &out); err != nil {
 						return err
 					}
+					res.Delivered++
 					continue
 				}
+				res.Delivered++
 				f.Interface = iface
 				text := cli.FrameLine(&f)
 				if f.IsError() {
@@ -246,7 +261,7 @@ produced. The same --seed gives the same faults.`,
 	f.StringArrayVar(&frames, "frame", nil, "A frame in cansend notation (repeatable)")
 	f.StringVar(&trace, "trace", "", "Frames from a trace file")
 	f.StringVar(&errClass, "error-frame", "", "Inject an error frame (virtual bus only)")
-	f.IntVar(&malformed, "malformed", 0, "Inject this many malformed frames (virtual bus only)")
+	intVar(f, &malformed, "malformed", "", 0, "Inject this many malformed frames (virtual bus only)")
 	f.BoolVar(&yes, "yes", false, "Confirm transmission on a non-virtual interface")
 	addLimitFlags(c, &limits, 0)
 	faults.add(c)
