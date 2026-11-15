@@ -6,6 +6,23 @@ with the version bump). It computes the tag, builds the binaries for linux
 publishes the GitHub release with the section of this file that matches the
 version as its notes. Add the section before running it.
 
+## v0.12.1
+
+**Date:** 2026-11-15
+**Previous release:** v0.12.0
+
+No command or flag is added or changed.
+
+### Changed
+
+- Built on go-canbus v0.10.1 (was v0.10.0) and go-serial v0.4.1 (was v0.4.0) (go-canbus RELEASE.md, v0.10.1; go-serial RELEASE.md, v0.4.1). For the tool this means:
+  - A DBC or KCD file larger than 64 MiB, an ARXML file larger than 1 GiB, a database with more than 262,144 signals, and a message longer than a CAN FD frame are refused with a parse error.
+  - A capture whose timestamp fields are outside their range is refused instead of read with another time, and a pcapng section holds at most 65,536 interface descriptions.
+  - A send that waits for another send ends when the command is stopped.
+  - On Windows a serial write to an SLCAN adapter that times out is reported as an error; on Linux and macOS an adapter path that is not a character device is refused when it is opened.
+
+---
+
 ## v0.12.0
 
 **Date:** 2026-11-14
